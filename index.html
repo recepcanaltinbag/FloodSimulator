@@ -322,6 +322,9 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="ctrl">
     <label style="justify-content:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="karstOn"> 🕳️ Karst modu <span class="muted" style="font-weight:400">(kireçtaşı + düdenler)</span></label>
     <p class="sub" id="karstInfo" style="margin-top:4px" hidden></p>
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:8px"><input type="checkbox" id="depSink"> 🕳️ Kapalı çukurlar yeraltına boşalsın</label>
+    <p class="sub" id="depInfo" style="margin-top:4px"></p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Kapalı çukur analizi: dolgu derinliği ≥ 2 m ve ≥ 5 hücrelik çukurlar OSM göl/baraj verisiyle karşılaştırılır; göl yoksa en alçak hücre yutak olur (5 m³/s). Topografya + OSM çıkarımıdır, jeoloji haritası değildir; DEM hataları yanlış işaret üretebilir.</p>
     <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken zemin “Karstik kireçtaşı” (80 mm/sa) olur ve her düden en çok 5 m³/s su yutar.</p>
   </div>
 
@@ -385,6 +388,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <div class="row"><span class="sw" style="background:var(--amber)"></span>"Dere" adlı yol (kuru)</div>
       <div class="row"><span class="sw" style="background:var(--warn)"></span>"Dere" adlı yol (su altında)</div>
       <div class="row"><span class="sw" style="background:var(--cyan)"></span>Dere / kanal</div>
+      <div class="row" id="lgDep" hidden><span class="sw" style="height:8px;width:8px;border-radius:50%;border:1.5px dashed #c58cff"></span>Kapalı çukur, göl yok</div>
       <div class="row" id="lgPonor" hidden><span class="sw" style="background:#0a8f8f;height:8px;width:8px;border-radius:50%;box-shadow:0 0 0 2px #0a8f8f inset,0 0 0 1px #000"></span>Varsayılan düden (karst)</div>
     </div>
     <button class="set-tab" id="setTab" aria-controls="settings">⚙️ Ayarlar</button>
@@ -406,6 +410,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <div class="pbody">
       <label><input type="checkbox" id="showRoads" checked> <span class="sw" style="background:var(--amber)"></span> Adında "dere" geçen yollar</label>
       <label><input type="checkbox" id="showWater" checked> <span class="sw" style="background:var(--cyan)"></span> Dereler / kanallar</label>
+      <label><input type="checkbox" id="showDep" checked> <span class="sw" style="background:#c58cff"></span> Kapalı çukurlar <span class="muted">(göl yok)</span></label>
       <label><input type="checkbox" id="showPonor" checked> <span class="sw" style="background:#0a8f8f"></span> Düdenler <span class="muted">(karst modu)</span></label>
       <div id="dereBody" class="muted" style="margin-top:6px">Bölge yüklenince gösterilecek.</div>
       <div class="muted" style="font-size:10.5px;margin-top:6px">Kaynak: OpenStreetMap</div>
@@ -789,7 +794,7 @@ async function loadRegion(shift){
     $("play").disabled=$("reset").disabled=false;
     if(!shift){ S.running=true; updPlay(); } // başlat butonu yok: yeni bölge yüklenince yağmur kendiliğinden başlar
     pickSet(S.lat,S.lon,S.name);
-    const lbl=()=>{ loadLabels(true); loadDere().then(()=>loadLabels()); }; // gömülü etiketler hemen; OSM etiketleri dere verisinden sonra
+    const lbl=()=>{ loadLabels(true); loadDere().then(()=>loadLabels()); depCheck(); }; // gömülü etiketler hemen; OSM etiketleri dere verisinden sonra
     if(shift) idle().then(lbl); else lbl();
   }catch(e){
     console.error(e);
@@ -920,6 +925,7 @@ const LCATS = {
   tourism:{t:"Turistik yerler", ic:"📸", pr:2, on:true},
   worship:{t:"Camiler / ibadet", ic:"🕌", pr:3, on:false},
   road:{t:"Ana caddeler",    ic:"",   pr:4, on:false},
+  cukur:{t:"Kapalı çukurlar", ic:"🕳️", pr:0.5, on:true},
 };
 Object.entries(LCATS).forEach(([k,c])=>{
   const l=document.createElement("label");
@@ -967,6 +973,7 @@ async function loadLabels(staticOnly){
     LABELS.sort((a,b)=>(b.top-a.top)||(a.pr-b.pr));
     LABELS.forEach(l=>{ l.el.style.display="block"; l.w=l.el.offsetWidth; l.h=l.el.offsetHeight; });
     Object.keys(LCATS).forEach(k=>$("lc-"+k).textContent=cnt[k]||"");
+    depLabels(true); // kapalı çukur etiketleri (cukur) LABELS'a yeniden eklenir
   };
   finish(); if(staticOnly) return;
   const bk=await baked();
@@ -986,7 +993,7 @@ function updateLabels(){
   const lvl=dist>220?0:dist>110?1:2, cap=[10,16,24][lvl];
   for(const l of LABELS){
     let show=LCATS[l.cat].on && placed.length<cap &&
-      (lvl===2 || l.cat==="suburb" || (lvl===1 && (l.cat==="square"||l.cat==="monument"||l.st)));
+      (lvl===2 || l.cat==="suburb" || l.cat==="cukur" || (lvl===1 && (l.cat==="square"||l.cat==="monument"||l.st)));
     if(show){
       const gx=Math.round(l.g[0]), gy=Math.round(l.g[1]), i=gy*N+gx;
       _v.set((l.g[0]/(N-1)-.5)*SIZE, Math.max(0,b[i]+(d?d[i]:0))*k+0.4, (l.g[1]/(N-1)-.5)*SIZE).project(camera);
@@ -1137,20 +1144,22 @@ function karstPrep(){
       if(j<0||done[j]) continue; done[j]=1; F[j]=b[j]>f?b[j]:f; push(j,F[j]);
     }
   }
-  const comp=new Uint8Array(n), sink=new Uint8Array(n), ponors=[], st=[]; let depN=0;
+  const comp=new Int32Array(n), sink=new Uint8Array(n), ponors=[], st=[], list=[]; let depN=0, id=0;
   for(let s0=0;s0<n;s0++){
     if(comp[s0]||F[s0]-b[s0]<=KARST_DMIN) continue;
-    let low=s0, mx=0; comp[s0]=1; st.push(s0);
+    let low=s0, mx=0, cnt=0, vol=0; comp[s0]=++id; st.push(s0);
     while(st.length){
-      const i=st.pop(), x=i%N, dd=F[i]-b[i]; depN++;
+      const i=st.pop(), x=i%N, dd=F[i]-b[i]; depN++; cnt++; vol+=dd;
       if(dd>mx) mx=dd; if(b[i]<b[low]) low=i;
       for(const j of [x>0?i-1:-1, x<N-1?i+1:-1, i>=N?i-N:-1, i<n-N?i+N:-1])
-        if(j>=0&&!comp[j]&&F[j]-b[j]>KARST_DMIN){ comp[j]=1; st.push(j); }
+        if(j>=0&&!comp[j]&&F[j]-b[j]>KARST_DMIN){ comp[j]=id; st.push(j); }
     }
     if(mx>=KARST_DPIT){ sink[low]=1; ponors.push(low); }
+    if(mx>=DEP_MIN_D && cnt>=DEP_MIN_N) list.push({id,low,mx,cnt,vol,lake:null,road:false});
   }
   Object.assign(KARST,{sink,ponors,depN});
-  karstUI();
+  DEPR={list,comp,sink:null,status:list.length?"bekliyor":"yok",src:""};
+  sinkRebuild(); karstUI(); depUI();
 }
 function setKarst(on){
   KARST.auto=false;
@@ -1159,15 +1168,116 @@ function setKarst(on){
     else if(KARST.soilPrev!=null && $("soil").value===String(KARST_INF)) $("soil").value=KARST.soilPrev;
     KARST.on=on;
   }
-  $("karstOn").checked=on; uiUpd(); karstUI(); drawDereOverlay(); updStats();
+  $("karstOn").checked=on; $("depSink").checked=on; sinkRebuild(); uiUpd(); karstUI(); depUI(); drawDereOverlay(); updStats();
 }
 function karstUI(){
-  const on=KARST.on;
-  $("stU").hidden=!on; document.querySelector(".stats").classList.toggle("k8",on); $("lgPonor").hidden=!on; $("karstInfo").hidden=!on;
+  const on=KARST.on, u=on||$("depSink").checked;
+  $("stU").hidden=!u; document.querySelector(".stats").classList.toggle("k8",u); $("lgPonor").hidden=!on; $("karstInfo").hidden=!on;
   if(on && KARST.sink) $("karstInfo").textContent=`Bu alanda ${KARST.ponors.length} kapalı çukur/düden bulundu · çukur alanı ≈ ${fmt(KARST.depN*S.cell*S.cell/1e6,2)} km².`;
 }
 $("karstOn").onchange=e=>setKarst(e.target.checked);
 $("showPonor").onchange=()=>drawDereOverlay();
+
+// ================= Kapalı çukur analizi (her yerde) =================
+// Aynı priority-flood çukurlarından yalnız anlamlı olanlar: dolgu derinliği ≥ DEP_MIN_D ve en az DEP_MIN_N hücre.
+// Neden: terrarium DEM'in düşey çözünürlüğü ~1 m, SRTM gürültüsü dağlarda birkaç metre; 3×3 yumuşatma tek hücrelik
+// çukurları siler, kalan 1–2 m'lik ve 1–4 hücrelik çukurlar çoğunlukla veri hatasıdır. Yol/demiryolu dolgusuna değen
+// ve DEP_ROAD_D'den sığ çukurlar "yol dolgusu olabilir" sayılır (köprü altı vadiler DEM'de kapalı görünür).
+// Sonra OSM su alanlarıyla (göl/baraj/gölet) ve deniz maskesiyle karşılaştırılır: göl olmayan çukurdaki su büyük
+// olasılıkla yeraltına süzülüyordur. Topografya + OSM çıkarımıdır, jeoloji haritası değildir.
+const DEP_MIN_D=2, DEP_MIN_N=5, DEP_ROAD_D=6, DEP_LBL=6; // m, hücre, m, en çok etiket
+let DEPR={list:[],comp:null,sink:null,status:"yok",src:""}, SINK=null;
+function sinkRebuild(){ // simülasyonun kullandığı ortak yutak dizisi: karst düdenleri + göl olmayan kapalı çukurlar
+  const k=KARST.on&&KARST.sink, dp=$("depSink").checked&&DEPR.sink;
+  if(!k&&!dp){ SINK=null; return; }
+  SINK=new Uint8Array(N*N);
+  if(k) for(const i of KARST.ponors) SINK[i]=1;
+  if(dp) for(let i=0;i<N*N;i++) if(DEPR.sink[i]) SINK[i]=1;
+}
+function polyRings(segs){ // OSM çoklu poligon üyelerini uç uca ekleyip halkalara çevir
+  const same=(a,c)=>a.lat===c.lat&&a.lon===c.lon, left=segs.filter(g=>g&&g.length>1).map(g=>g.slice()), out=[];
+  while(left.length){
+    let r=left.shift();
+    for(let k=0;k<500&&!same(r[0],r[r.length-1]);k++){
+      const e=r[r.length-1], j=left.findIndex(g=>same(g[0],e)||same(g[g.length-1],e)); if(j<0) break;
+      const g=left.splice(j,1)[0]; if(!same(g[0],e)) g.reverse(); r=r.concat(g.slice(1));
+    }
+    out.push(r);
+  }
+  return out;
+}
+async function depCheck(){
+  const D=DEPR, reg=REG;
+  if(!D.list.length){ D.status="yok"; depUI(); return; }
+  D.status="kontrol"; depUI();
+  const [[s,w],[nn,e]]=regionBounds(S.lat,S.lon,S.size), bb=`(${s},${w},${nn},${e})`;
+  // osm-cache.js yalnız dere/etiket sorgularını yakalar; bu sorgu doğrudan Overpass'a gider
+  const q=`[out:json][timeout:30];(way["natural"="water"]${bb};relation["natural"="water"]${bb};way["landuse"="reservoir"]${bb};relation["landuse"="reservoir"]${bb};way["water"~"^(lake|reservoir|pond)$"]${bb};way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"]${bb};way["railway"="rail"]${bb};);out geom;`;
+  const js=await overpass(q,30000);
+  if(D!==DEPR||reg!==REG) return;
+  const cv=document.createElement("canvas"); cv.width=cv.height=N;
+  const g=cv.getContext("2d",{willReadFrequently:true}), P=p=>ll2grid(p.lat,p.lon);
+  const W=new Uint8Array(N*N), R=new Uint8Array(N*N), pts=r=>r.forEach((p,k)=>{ const q=P(p); k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); });
+  if(js){
+    g.fillStyle="#fff"; g.beginPath();
+    for(const el of js.elements){
+      const t=el.tags||{}; if(t.highway||t.railway) continue;
+      const rings=el.type==="relation" ? polyRings((el.members||[]).filter(m=>m.type==="way").map(m=>m.geometry)) : [el.geometry];
+      for(const r of rings) if(r&&r.length>2){ pts(r); g.closePath(); }
+    }
+    g.fill("evenodd");
+    let a=g.getImageData(0,0,N,N).data; for(let i=0;i<N*N;i++) if(a[i*4+3]>=128) W[i]=1;
+    g.clearRect(0,0,N,N); g.strokeStyle="#fff"; g.lineWidth=1.5; g.beginPath();
+    for(const el of js.elements){ const t=el.tags||{}; if((t.highway||t.railway)&&el.geometry) pts(el.geometry); }
+    g.stroke(); a=g.getImageData(0,0,N,N).data; for(let i=0;i<N*N;i++) if(a[i*4+3]>=96) R[i]=1;
+    D.src="OSM";
+  } else if(satCanvas){ // yedek: uydu renginden koyu/mavimsi su sezgisi; hücre başına 4×4 örnek (küçük buzul gölleri kaybolmasın)
+    const M=4*N; cv.width=cv.height=M; g.drawImage(satCanvas,0,0,M,M); const a=g.getImageData(0,0,M,M).data;
+    for(let y=0;y<M;y++)for(let x=0;x<M;x++){ const k=(y*M+x)*4, r=a[k], gg=a[k+1], bl=a[k+2];
+      const lum=.3*r+.59*gg+.11*bl; if(lum<28 || (lum<70 && bl>=r)) W[(y>>2)*N+(x>>2)]++; } // dağ gölleri çok koyu yeşil-siyah görünür
+    for(let i=0;i<N*N;i++) W[i]=W[i]>=4?1:0; // hücrenin ≥ %25'i su
+    D.src="uydu";
+  } else D.src="";
+  for(let i=0;i<N*N;i++) if(sea[i]) W[i]=1;
+  const by=new Map(D.list.map(d=>[d.id,d]));
+  for(const d of D.list){ d.wc=0; }
+  for(let i=0;i<N*N;i++){
+    const d=by.get(D.comp[i]); if(!d) continue;
+    if(W[i]) d.wc++;
+    const x=i%N; if(R[i]||(x>0&&R[i-1])||(x<N-1&&R[i+1])||(i>=N&&R[i-N])||(i<N*N-N&&R[i+N])) d.road=true;
+  }
+  const sink=new Uint8Array(N*N);
+  for(const d of D.list){
+    d.lake = D.src ? d.wc>=Math.max(1,Math.min(3,0.15*d.cnt)) : null; // birkaç su hücresi bile göl sayılır (küçük göller hücreden küçük)
+    d.art = d.road && d.mx<DEP_ROAD_D && !d.lake;
+    if(d.lake===false&&!d.art) sink[d.low]=1;
+  }
+  D.sink=sink; D.status=D.src?"tamam":"doğrulanamadı";
+  sinkRebuild(); depUI(); depLabels(true); drawDereOverlay();
+}
+function depUI(){
+  const D=DEPR, L=D.list, nl=L.filter(d=>d.lake===false&&!d.art).length;
+  $("lgDep").hidden=!(nl&&$("showDep").checked);
+  $("depInfo").textContent = D.status==="yok" ? "Bu alanda anlamlı kapalı çukur yok." :
+    D.status==="bekliyor"||D.status==="kontrol" ? `${L.length} kapalı çukur bulundu · göl verisi kontrol ediliyor…` :
+    D.status==="doğrulanamadı" ? `${L.length} kapalı çukur · göl verisine ulaşılamadı, doğrulanamadı (yeraltına boşalma uygulanmaz).` :
+    `${L.length} kapalı çukur: ${L.filter(d=>d.lake).length} göl/baraj, ${nl} göl yok`+
+    (L.some(d=>d.art)?`, ${L.filter(d=>d.art).length} yol dolgusu olabilir`:"")+(D.src==="uydu"?" (OSM yanıt vermedi; uydu rengine göre)":" (OSM)")+".";
+}
+function depLabels(measure){ // göl olmayan en büyük çukurlara etiket (LABELS listesine "cukur" kategorisiyle)
+  LABELS=LABELS.filter(l=>{ if(l.cat!=="cukur") return true; l.el.remove(); return false; });
+  const top=DEPR.list.filter(d=>d.lake===false&&!d.art).sort((a,c)=>c.vol-a.vol).slice(0,DEP_LBL);
+  for(const d of top){
+    const el=document.createElement("div"); el.className="lb c-cukur"; el.textContent="🕳️ Su burada yeraltına batıyor olabilir";
+    el.title=`Kapalı çukur, göl yok · derinlik ${fmt(d.mx,1)} m · ${fmt(d.cnt*S.cell*S.cell/1e4,1)} ha`;
+    $("labels").appendChild(el);
+    LABELS.push({cat:"cukur",name:"",g:[d.low%N,Math.floor(d.low/N)],el,pr:0.5,top:false,st:false,w:0,h:0});
+  }
+  $("lc-cukur").textContent=top.length||"";
+  if(measure){ LABELS.sort((a,c)=>(c.top-a.top)||(a.pr-c.pr)); LABELS.forEach(l=>{ if(l.cat!=="cukur") return; l.el.style.display="block"; l.w=l.el.offsetWidth; l.h=l.el.offsetHeight; }); }
+}
+$("depSink").onchange=()=>{ sinkRebuild(); karstUI(); updStats(); };
+$("showDep").onchange=()=>{ depUI(); drawDereOverlay(); };
 
 // ================= Simülasyon (virtual pipes) =================
 function resetWater(){
@@ -1208,7 +1318,7 @@ function simStep(dt){
   const allow=Math.min(sw.rate*(1-S.block/100)*toM, Math.max(0,storeM-S.stored)+outStep);
   let taken=0;
   // karst: zemine süzülen ve düdenlerden yutulan su "yeraltına" sayılır (mod kapalıyken hiçbir şey değişmez)
-  const K=KARST.on?KARST.sink:null, pq=PONOR_Q*dt/l2; let under=0, underP=0;
+  const K=SINK, pq=PONOR_Q*dt/l2; let under=0, underP=0;
   for(let y=0;y<N;y++){
     for(let x=0;x<N;x++){
       const i=y*N+x;
@@ -1683,6 +1793,12 @@ function drawDereOverlay(){
   dereTex.needsUpdate=true;
 }
 function drawPonors(g,f){
+  if($("showDep").checked) for(const d of DEPR.list){ // göl olmayan kapalı çukurlar: mor kesikli halka
+    if(d.lake!==false||d.art) continue;
+    const x=(d.low%N)*f, y=Math.floor(d.low/N)*f, r=Math.max(7,f*Math.min(6,1+Math.sqrt(d.cnt)/2));
+    g.beginPath(); g.arc(x,y,r,0,7); g.setLineDash([]); g.lineWidth=5; g.strokeStyle="rgba(0,0,0,.5)"; g.stroke();
+    g.setLineDash([6,4]); g.lineWidth=2.6; g.strokeStyle="#c58cff"; g.stroke(); g.setLineDash([]);
+  }
   if(!KARST.on||!$("showPonor").checked) return;
   const r=Math.max(5,f*1.4);
   for(const i of KARST.ponors){
@@ -1710,14 +1826,15 @@ function updStats(){
   $("gS").style.width=full+"%"; $("gS").style.background = full>95?"var(--warn)":full>70?"var(--amber)":"var(--accent)";
   $("sK").textContent = S.drained>1e6 ? fmt(S.drained/1e6,2)+" milyon m³" : fmt(S.drained)+" m³";
   const uv=v=>v>1e6 ? fmt(v/1e6,2)+" milyon m³" : fmt(v)+" m³";
-  if(KARST.on){ $("sU").textContent=uv(S.under); $("stU").title=`Zemine süzülen: ${uv(S.under-S.underP)} · düdenlerden: ${uv(S.underP)}`; }
+  if(SINK||KARST.on){ $("sU").textContent=uv(S.under); $("stU").title=`Zemine süzülen: ${uv(S.under-S.underP)} · düden/çukurlardan: ${uv(S.underP)}`; }
   const raining=S.simT<S.durH*3600;
   $("liveSt").textContent = S.simT===0 ? `${S.name} · hazır` :
     `${raining?"🌧️":"☁️"} ${S.rate} mm/sa · ${$("sT").textContent}${S.running?"":" · duraklatıldı"}`;
   $("hud").innerHTML = S.simT===0 ? `<b>${S.name}</b><br><span class="muted">Yağmur başlıyor…</span>` :
     (raining ? `🌧️ Yağıyor · <b>${S.rate} mm/sa</b>` : "☁️ Yağmur durdu · su çekiliyor/birikiyor") +
     (full>95 && raining ? `<br><span style="color:var(--warn)">⚠️ Kanalizasyon dolu, ızgaralar suyu alamıyor</span>` : "") +
-    (KARST.on ? `<br><span style="color:#3fd6d6">🕳️ Karst modu · ${KARST.ponors.length} düden · yeraltına ${uv(S.under)}</span>` : "") +
+    (KARST.on ? `<br><span style="color:#3fd6d6">🕳️ Karst modu · ${KARST.ponors.length} düden · yeraltına ${uv(S.under)}</span>` :
+     SINK ? `<br><span style="color:#c58cff">🕳️ Kapalı çukurlar boşalıyor · yeraltına ${uv(S.under)}</span>` : "") +
     `<br><span class="muted">${S.name} · 1 hücre ≈ ${fmt(S.cell)} m</span>`;
   updDereStats();
 }
