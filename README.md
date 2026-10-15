@@ -45,10 +45,45 @@ Kurulum gerekmez; tek bir HTML sayfası ve yardımcı betiklerden oluşur, telef
 - **Akış:** 2B sığ su yaklaşımı ("sanal borular" yöntemi) ve Manning sürtünmesi; 256 × 256 hücrelik pencere (orta boy bölgede hücre ≈ 29 m). LISFLOOD-FP gibi bilimsel modellerin sadeleştirilmiş bir akrabasıdır.
 - **Kayıplar:** zemin sızması (Horton: zemin ıslandıkça azalır; önceki günlerin yağışı seçilebilir, yukarı havzaya da uygulanır), kanalizasyon (toplu kapasite: ızgara çekişi + boru hacmi + deşarj), karst düdenleri ve kapalı çukur yutakları.
 - **Dereler:** OSM dere hatları boyunca arazi alçaltılır (stream burning); köprü tablaları yalnızca görüntüde kalır.
-- **Yukarı havza:** pencere dışında ~115 m'lik kaba arazi üzerinde D8 akış yönleri ve priority-flood; su, yamaçta ~0,5, derede ~1,5 m/s varsayımıyla gecikmeli girer. Dışarıda kanalizasyon kaybı düşülmez (ya şebeke yoktur ya da yağmur suyu zaten derelere boşalır); zemin en az "Karışık kentsel" sayılır.
+- **Yukarı havza:** pencere dışında ~115 m'lik kaba arazi üzerinde D8 akış yönleri ve priority-flood; su, yamaçta ~0,5, derede ~1,5 m/s varsayımıyla gecikmeli girer. Dışarıda kanalizasyon kaybı düşülmez (ya şebeke yoktur ya da yağmur suyu zaten derelere boşalır); zemin en az "Karışık kentsel" sayılır ("Haritadan" zemin seçiliyse dış hücreler zemin haritasından örneklenir).
 - **Drenaj alanı:** Rasyonel Yöntem (Q = C·i·A/3,6) ve Kirpich toplanma süresi.
 
 Her şey tarayıcıda, JavaScript ve Three.js ile hesaplanır; sunucu tarafı yoktur.
+
+## Zemin emişi haritası
+
+Ayarlarda **Zemin → "Haritadan (arazi örtüsü + toprak)"** seçilince her hücre kendi Horton eğrisini kullanır: f = fc + (f0 − fc)·e^(−x). Islaklık x ("Önceki günler" ile başlar) pencere boyunca ortaktır, çünkü yağış her yere eşit düşer. Görünüm → **"Zemin emişi haritası"** anlık emişi renklendirir; fare ipucu hücrenin arazi örtüsünü, toprağını ve şu anki emişini yazar. Varsayılan seçim değişmedi (Beton / asfalt + Doygun).
+
+Her hücre için üç bilgi birleştirilir:
+
+| Bilgi | Kaynak | Çözünürlük |
+|---|---|---|
+| Arazi örtüsü (baskın sınıf) ve yapı payı | ESA WorldCover 2021 v200 | 10 m → ~30 m (z12) / ~120 m (z10) |
+| Toprak dokusu (USDA, 0–30 cm kum ve kil) | SoilGrids 2.0 | 250 m |
+| Karbonatlı kayaç (baskın kayaç türü) | GLiM, 0,5° ızgara | ~50 km, çok kaba |
+
+Parametreler (mm/sa):
+
+- **fc (doygunken)** ≈ doygun hidrolik iletkenlik, Rawls, Brakensiek & Miller (1983) doku ortalamaları: kum 117,8 · tınlı kum 29,9 · kumlu tın 10,9 · siltli tın ve silt 6,5 · tın 3,4 · kumlu killi tın 1,5 · killi tın ve siltli killi tın 1,0 · kumlu kil 0,6 · siltli kil 0,5 · kil 0,3. Horton'un en düşük kapasitesini Ks'ye yakın almak SWMM'de önerilen yaklaşımdır (Rossman & Huber 2016).
+- **f0 (kuruyken):** Akan (1993) değerleri; SWMM kılavuzunda da aktarılır. Bitki örtüsü az olan kuru zeminde kumlu 127, tınlı 76, killi 25; sık olanda 254, 152, 51. Ağaçlık sık sayılır; tarım, çıplak alan ve yosun az sayılır. Çalı ve çayıra ikisinin ortası verilir; bu ara değer bizim varsayımımızdır.
+- **Yapı payı:** WorldCover'ın 10 m'lik "yapı" pikselleri sitedeki "Beton / asfalt" (6 → 1) değerini alır. Hücrenin geri kalanı yukarıdaki toprak + örtü değerini alır.
+- **Özel durumlar:** Su yüzeyi emmez. Sulak alan neredeyse doygun sayılır (f0 = fc). GLiM'de karbonatlı olan bölgede çıplak / seyrek bitkili alan "Karstik kireçtaşı" (150 → 60) olur. Verisi olmayan hücre "Karışık kentsel" (30 → 3) sayılır. k = 2 /sa (sitedeki diğer sınıflarla aynı).
+- **Yukarı havza:** pencereye akan dış hücreler aynı karolardan örneklenir; her parametre sınıfının yağış fazlası alanıyla ağırlıklandırılır. Bu seçenekte "dışarısı en az Karışık kentsel" kuralı uygulanmaz.
+
+**Hesaba katılmayanlar:** toprak derinliği, sıkışma, kök ve solucan kanalları (makro gözenekler), eğim, donmuş zemin ve kentte asfalt altındaki gerçek toprak. WorldCover'da "yapı" sınıfı küçük bahçeleri de içine alabilir. SoilGrids bir tahmin modelidir; kentte toprak tahmini özellikle belirsizdir. GLiM ızgarası tek tek kayalıkları ayırt etmez; karst için asıl araç yine **Karst modu**dur. Karst modu açıldığında bu seçenek korunur.
+
+**İlk deneme** ([rapor](docs/zemin-emisi-deneme.md)):
+- Kağıthane'de 40 mm/sa · 3 sa yağışta harita "Beton / asfalt"a yakın sonuç veriyor; su basan alan seçimden seçime %1–2'den fazla değişmiyor.
+- Taşeli karst platosunda harita, karst modunun "Karstik kireçtaşı" varsayımından çok daha az emiyor. Çayır/mera tınlı toprak sayılıyor ve epikarst görülmüyor.
+- SoilGrids Türkiye'yi büyük ölçüde killi tın / tın / kil olarak tahmin ediyor; kumlu zeminler neredeyse yok. Kentlerde toprak tahmini yok, çevreden dolduruluyor.
+
+**Kapsam:** z12 karoları (~30 m) İstanbul ilini, FABDEM yamalarını (karst alanları, dağlar) kapsar. z10 karoları (~120 m) Türkiye kutusunun karada kalan kısmını kapsar ve yedek olarak kullanılır. Karolar `data/infil/` altındadır, üretim betiği `tools/make_infil_tiles.py`.
+
+**Neden bu veriler?** Açık ve yeniden dağıtılabilir lisanslı oldukları için seçildi. Şunları kullanmadık:
+- MTA 1:500.000 jeoloji haritası: açık lisansla yayımlandığını bulamadık.
+- GLiM vektör verisi: CCGM lisans sözleşmesine bağlı.
+- WOKAM karst haritası: lisansı belirtilmemiş (© BGR).
+- HYSOGs250m: NASA Earthdata girişi gerektiriyor. Toprak grubu zaten SoilGrids dokusundan türetilebiliyor.
 
 ## Ne kadar doğru?
 
@@ -62,7 +97,7 @@ Modeli 14 Ekim 2026 selinde su bastığı haberlere yansıyan 74 noktayla karş�
 
 - **Yükseklik verisi kaba:** 30 m çözünürlük, birkaç metre dikey hata; binalar, alt geçitler, duvarlar, bordürler ve menfezler yok. Su derinliği bu hatalardan daha küçük olduğu için en büyük belirsizlik kaynağıdır.
 - **Kanalizasyon tek bir kapasiteyle** temsil edilir; gerçek boru ağı ve geri tepme yoktur.
-- **Zemin emmesi tek bir Horton eğrisiyle** temsil edilir: pencere boyunca aynı zemin türü ve ıslaklık varsayılır; zemin haritası kullanılmaz.
+- **Zemin emmesi** varsayılan olarak tek bir Horton eğrisiyle temsil edilir (pencere boyunca aynı zemin). "Haritadan" seçeneğinde her hücrenin kendi eğrisi vardır, ama ıslaklık yine pencere boyunca ortaktır ve parametreler sınıf ortalamalarıdır (bkz. [Zemin emişi haritası](#zemin-emişi-haritası)).
 - **Yağış pencere boyunca her yere eşit** düşer; gerçek sağanaklar birkaç km'lik hücrelerle gelir.
 - Derinlikler belirli bir noktada iki kat fazla ya da az çıkabilir. Senaryoları **birbirleriyle karşılaştırmak** tek bir sonuca güvenmekten daha sağlıklıdır.
 
@@ -89,7 +124,8 @@ Ardından tarayıcıda `http://localhost:8765/` adresini açın. Derleme adımı
 | `osm-cache.js` · `data/` | Gömülü OSM verisi (dereler, etiketler, hazır bölgelerin göl/yol verisi) |
 | `cloudfix.js` · `edgefix.js` · `cta.js` · `clamp.js` · `ready.js` | Bulutlu uydu karosu düzeltmesi, kenar düzeltmesi, arayüz yardımcıları |
 | `dem/fabdem/` | FABDEM karoları |
-| `docs/` | Doğrulama raporu |
+| `infil.js` · `data/infil/` · `tools/make_infil_tiles.py` | Zemin emişi haritası: hücre bazında sızma, karolar, üretim betiği |
+| `docs/` | Doğrulama raporu, zemin emişi haritası denemesi |
 
 ## Veri ve künye
 
@@ -97,6 +133,10 @@ Ardından tarayıcıda `http://localhost:8765/` adresini açın. Derleme adımı
 - FABDEM v1-2: Hawker vd. (2022), *A 30 m global map of elevation with forests and buildings removed*, Environ. Res. Lett. 17 024016; University of Bristol, **CC BY-NC-SA 4.0**. `dem/fabdem/` karoları bu lisansla türetilmiştir. Copernicus WorldDEM-30 © DLR e.V. 2010-2014 ve © Airbus Defence and Space GmbH 2014-2018, Copernicus programı kapsamında AB ve ESA tarafından sağlanmıştır.
 - Uydu görüntüsü: Esri World Imagery (ve Wayback arşivi); bulutlu karolarda Sentinel-2 cloudless (EOX)
 - Harita verisi: © [OpenStreetMap](https://www.openstreetmap.org/copyright) katkıcıları (ODbL), Overpass API, Nominatim
+- Arazi örtüsü: © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium. Zanaga vd. (2022), ESA WorldCover 10 m 2021 v200, [doi:10.5281/zenodo.7254221](https://doi.org/10.5281/zenodo.7254221), **CC BY 4.0**
+- Toprak: SoilGrids 2.0, ISRIC – World Soil Information. Poggio vd. (2021), *SoilGrids 2.0: producing soil information for the globe with quantified spatial uncertainty*, SOIL 7, 217–240, [doi:10.5194/soil-7-217-2021](https://doi.org/10.5194/soil-7-217-2021), **CC BY 4.0**
+- Kayaç: GLiM v1.0, 0,5° ızgara. Hartmann & Moosdorf (2012), *The new global lithological map database GLiM*, Geochem. Geophys. Geosyst. 13, Q12004, [doi:10.1029/2012GC004370](https://doi.org/10.1029/2012GC004370); veri [doi:10.1594/PANGAEA.788537](https://doi.org/10.1594/PANGAEA.788537), **CC BY 3.0**
+- Sızma parametreleri: Rawls, W.J., Brakensiek, D.L. & Miller, N. (1983), *Green-Ampt infiltration parameters from soils data*, J. Hydraul. Eng. 109(1), 62–70. Akan, A.O. (1993), *Urban Stormwater Hydrology*, Technomic. Rossman, L.A. & Huber, W.C. (2016), *Storm Water Management Model Reference Manual Volume I – Hydrology*, EPA/600/R-15/162A
 - Yağış: [Open-Meteo](https://open-meteo.com/) (ECMWF topluluk tahmini dahil); ölçümler İBB AKOM ve MGM açıklamalarından
 - İl/ilçe merkezleri: OSM (Nominatim) + geoBoundaries ADM2; dağ zirveleri: Wikidata/OSM
 - Kütüphaneler: [Three.js](https://threejs.org/) r128, [Leaflet](https://leafletjs.com/), geotiff.js, proj4js
@@ -105,6 +145,7 @@ Ardından tarayıcıda `http://localhost:8765/` adresini açın. Derleme adımı
 
 - **Kod:** [MIT](LICENSE).
 - **`dem/fabdem/` karoları:** FABDEM'den türetilmiştir, **CC BY-NC-SA 4.0** (ticari olmayan kullanım, aynı lisansla paylaşım). MIT lisansının kapsamında değildir.
+- **`data/infil/` karoları:** ESA WorldCover 2021 ve SoilGrids 2.0'dan (ikisi de CC BY 4.0) ve GLiM 0,5° ızgarasından (CC BY 3.0) türetilmiştir. Yeniden örneklenmiş, sınıflandırılmış ve birleştirilmiştir; atıfla serbestçe kullanılabilir. MIT lisansının kapsamında değildir.
 - **`data/istanbul_osm.json` ve `data/osm_area/`:** OpenStreetMap verisinden türetilmiştir, © OpenStreetMap katkıcıları, **ODbL 1.0**.
 - **`data/tr_*.js`:** OSM/Nominatim, geoBoundaries, Wikidata ve Wikipedia'dan derlenmiş yer listeleri; kaynakların kendi koşulları geçerlidir.
 - Uydu görüntüleri, yükseklik ve yağış servisleri kendi kullanım koşullarına tabidir (bkz. [Veri ve künye](#veri-ve-künye)).

@@ -383,6 +383,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <option value="25">Toprak / orman · 75 → 10 mm/sa</option>
       <option value="80">Karstik kireçtaşı · 150 → 60 mm/sa</option>
       <option value="0">Hiç emmesin (en kötü durum)</option>
+      <option value="map">Haritadan (arazi örtüsü + toprak) · hücre hücre</option>
     </select>
     <label style="margin-top:8px">Önceki günler</label>
     <select id="ante">
@@ -437,6 +438,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <option value="satelev">Uydu + yükseklik renkleri</option>
       <option value="satroad">Uydu + yollar</option>
       <option value="elev">Yükseklik renkleri</option>
+      <option value="inf">Zemin emişi haritası</option>
     </select>
   </div>
   <div class="ctrl udem" id="udemSet"></div>
@@ -488,6 +490,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <div class="row"><span class="sw" style="background:var(--cyan)"></span>Dere / kanal</div>
       <div class="row" id="lgDep" hidden><span class="sw" style="height:8px;width:8px;border-radius:50%;border:1.5px dashed #c58cff"></span>Kapalı çukur, göl yok</div>
       <div class="row" id="lgUp" hidden><span class="sw" style="width:0;height:0;border-radius:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #8fd3ff"></span>Havzadan su girişi</div>
+      <div id="lgInf" hidden><div style="margin-top:6px">Zemin emişi (şu an)</div><div class="bar" style="background:linear-gradient(90deg,#5a1e1e,#c8562a,#e9c46a,#7cc47f,#2a9d8f,#1d5fa8)"></div><div class="ticks"><span>≤1</span><span>10</span><span>100+ mm/sa</span></div></div>
       <div class="row" id="lgPonor" hidden><span class="sw" style="background:#0a8f8f;height:8px;width:8px;border-radius:50%;box-shadow:0 0 0 2px #0a8f8f inset,0 0 0 1px #000"></span>Varsayılan düden (karst)</div>
     </div>
     <button class="set-tab" id="setTab" aria-controls="settings">⚙️ Ayarlar</button>
@@ -746,7 +749,7 @@ SCEN.forEach(s=>{
 $("scen").append(scenXb, scenX);
 function uiUpd(){
   S.rate=+$("rate").value; S.durH=+$("dur").value;
-  S.soilV=$("soil").value; S.soil=SOILS[S.soilV]||SOILS["8"]; S.ante=ANTE[$("ante").value]||0;
+  S.soilV=$("soil").value; S.soil=S.soilV==="map" ? (window.infMean?infMean():SOILS["8"]) : SOILS[S.soilV]||SOILS["8"]; S.ante=ANTE[$("ante").value]||0;
   if(S.simT===0) S.wetX=S.ante;   // yağış başladıktan sonra zemin seçimi değişirse ıslaklık korunur
   S.inf=infCap(); soilUI();
   const sp=SPEEDS[+$("spd").value]; S.speed=sp.v;
@@ -761,6 +764,7 @@ function uiUpd(){
 }
 function soilUI(){
   const p=S.soil, el=$("soilInfo"); if(!el) return;
+  if(S.soilV==="map"&&window.infSoilText){ el.textContent=infSoilText(); return; }
   el.textContent = p.f0<=0 ? "Zemin hiç su emmez; yağışın tamamı akışa geçer." :
     `Zemin şu an saatte ${fmt(S.inf,1)} mm emiyor. Kuruyken ${p.f0} mm/sa emer, ıslandıkça ${p.fc} mm/sa'e iner (Horton). Yukarı havzaya da aynısı uygulanır.`;
 }
@@ -834,7 +838,7 @@ async function inflateZ(u8){
   const ds=new DecompressionStream("deflate"), w=ds.writable.getWriter(); w.write(u8); w.close();
   return new Uint8Array(await new Response(ds.readable).arrayBuffer());
 }
-async function pngHeights(buf){
+async function pngPixels(buf){ // 8 bit RGB/RGBA, 256×256 PNG → ham piksel baytları (canvas renk yönetimi/gürültüsü yok)
   const u=new Uint8Array(buf), dv=new DataView(buf);
   if(u[0]!==0x89||u[1]!==0x50) return null;
   let o=8, W=0, Hh=0, ct=0, idat=[], n=0;
@@ -860,7 +864,11 @@ async function pngHeights(buf){
       px[row+x]=v&255;
     }
   }
-  const h=new Float32Array(65536);
+  return {px,bpp};
+}
+async function pngHeights(buf){
+  const r=await pngPixels(buf); if(!r) return null;
+  const {px,bpp}=r, h=new Float32Array(65536);
   for(let i=0,j=0;i<65536;i++,j+=bpp) h[i]=px[j]*256+px[j+1]+px[j+2]/256-32768;
   return h;
 }
@@ -986,7 +994,7 @@ async function loadRegion(shift){
     $("regName").textContent=S.name;
     $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
     b=sb; sea=nsea; S.cell=cell;
-    karstPrep(); upPrep();
+    karstPrep(); upPrep(); if(window.infPrep) infPrep();
     S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
     elevCanvas=null; roadCanvas=null; blendCanvas=null; // yükseklik renkleri gerektiğinde üretilir
     satCanvas=sat; if(!sat) $("tex").value="elev";
@@ -1384,7 +1392,7 @@ function karstPrep(){
 function setKarst(on){
   KARST.auto=false;
   if(on!==KARST.on){
-    if(on){ KARST.soilPrev=$("soil").value; $("soil").value=String(KARST_INF); }
+    if(on){ KARST.soilPrev=$("soil").value; if(KARST.soilPrev!=="map") $("soil").value=String(KARST_INF); } // haritadan zemin seçiliyse korunur
     else if(KARST.soilPrev!=null && $("soil").value===String(KARST_INF)) $("soil").value=KARST.soilPrev;
     KARST.on=on;
   }
@@ -1613,7 +1621,8 @@ function upAnalyze(p){ // saf fonksiyon: Worker'da da çalışır (dış değiş
       ch.push((X0+u+.5)*f,(Y0+v+.5)*f,Math.max(dem[i],0),(X0+uj+.5)*f,(Y0+vj+.5)*f,Math.max(hj,0)); }
   }
   let totA=0; for(const q of CL) totA+=q.area;
-  return {C,CL,nn,hS,hK,hA,deps,maxK,seg:new Float32Array(seg),ch:new Float32Array(ch),totA,depN:K.length,cm};
+  const con=new Uint8Array(n); for(let i=0;i<n;i++) if(term[i]!==-1) con[i]=1; // pencereye akan dış hücreler (zemin haritası için)
+  return {C,CL,nn,hS,hK,hA,deps,maxK,seg:new Float32Array(seg),ch:new Float32Array(ch),totA,depN:K.length,cm,con};
 }
 function upRun(p){
   if(UP.worker===undefined){
@@ -1640,6 +1649,7 @@ async function upPrep(){
     const res=await upRun({gen,G,dem,f,X0,Y0,x0:reg.x0,y0:reg.y0,N,cm,dt:UP_DT,vS:UP_VS,vC:UP_VC,aC:UP_AC,kMax:UP_KMAX,dMin:KARST_DMIN,dPit:KARST_DPIT,sig:UP_SIG,rad:UP_RAD});
     if(gen!==UP.gen||reg!==REG||!UP.on) return;
     upBuild(res,f);
+    if(window.infUpPrep) infUpPrep({zc,X0,Y0,G,con:res.con});
   }catch(e){ console.warn("Yukarı havza hesaplanamadı",e); if(gen===UP.gen){ UP.status="hata"; upUI(); } }
 }
 function upBuild(res,f){
@@ -1696,7 +1706,8 @@ function upTick(){ // her UP_DT saniyede bir: dış alanın yağış fazlası ve
   // Kanalizasyon kaybı uygulanmaz: dışarıda şebeke ya yok (orman, köy) ya da yağmur suyu zaten derelere boşalır,
   // yani dereden aşağı gelen suyu azaltmaz. Yalnızca zemin sızması (Horton) düşülür.
   const t=UP.tick++, s=UP_DT/3.6e6;
-  let a=Math.max(0,(t*UP_DT<S.durH*3600?S.rate:0)-upInf())*s;
+  const r=t*UP_DT<S.durH*3600?S.rate:0;
+  let a=(S.soilV==="map"&&window.infUpExcess ? infUpExcess(r) : Math.max(0,r-upInf()))*s;
   UP.eH[t]=a; UP.sH[t]=(SINK||KARST.on)?1:0;
   const R=UP.R; if(!R||!UP.on) return;
   upRoute(t);
@@ -1800,6 +1811,8 @@ function simStep(dt){
   // zemin ıslandıkça sızma kapasitesi düşer (Horton); yukarı havza da bir sonraki dakikada bu değeri kullanır
   if(S.inf>0){ S.wetX += S.soil.k*dt/3600*Math.min(1,(raining?S.rate:0)/S.inf); S.inf=infCap(); }
   const inf = S.inf/1000/3600*dt;
+  // "Haritadan" zemin: hücre başına Horton eğrisi (fc + (f0−fc)·e^−x, mm/sa), ıslaklık x tüm pencerede ortak
+  const IM=S.soilV==="map"&&window.INFM&&INFM.ok?INFM:null, IFc=IM&&IM.fc, IDd=IM&&IM.dd, iEx=Math.exp(-S.wetX), iTo=dt/3.6e6;
   const sw=S.sewer, toM=dt/1000/3600;
   const outStep=sw.out*toM, storeM=sw.store/1000;
   const allow=Math.min(sw.rate*(1-S.block/100)*toM, Math.max(0,storeM-S.stored)+outStep);
@@ -1817,9 +1830,10 @@ function simStep(dt){
       if(y>0) inflow+=fB[i-N];
       if(y<N-1) inflow+=fT[i+N];
       const out=fL[i]+fR[i]+fT[i]+fB[i];
-      let nd=d[i]+dt*(inflow-out)/l2+rain-inf;
+      const fi=IM?(IFc[i]+IDd[i]*iEx)*iTo:inf;
+      let nd=d[i]+dt*(inflow-out)/l2+rain-fi;
       if(K){
-        if(nd>-inf) under+=nd<0?nd+inf:inf;
+        if(nd>-fi) under+=nd<0?nd+fi:fi;
         if(K[i]&&nd>0){ const tk=nd<pq?nd:pq; nd-=tk; underP+=tk; }
       }
       if(allow>0 && nd>0){ const tk=nd<allow?nd:allow; nd-=tk; taken+=tk; }
@@ -2228,6 +2242,7 @@ async function applyTexture(){
     }
     src=blendCanvas;
   }
+  if(mode==="inf" && window.infCanvas){ const c=infCanvas(); if(c) src=c; }
   if(mode==="satroad" && satCanvas){
     if(!roadCanvas){
       try{
@@ -2503,7 +2518,7 @@ function showTip(){
     for(const rd of DERE.roads) for(const p of rd.pts){ const dd=Math.hypot(p.g[0]-gx,p.g[1]-gy); if(dd<best){best=dd;near=rd.name;} }
   }
   tip.classList.add("on"); tip.style.left=(e.clientX-r.left+14)+"px"; tip.style.top=(e.clientY-r.top+14)+"px";
-  tip.innerHTML = sea[i] ? "Deniz" : `${near?`🛣️ <b>${near}</b><br>`:""}Yükseklik: <b>${fmt(b[i])} m</b><br>Su: <b>${waterTxt(i,x)}</b>`;
+  tip.innerHTML = sea[i] ? "Deniz" : `${near?`🛣️ <b>${near}</b><br>`:""}Yükseklik: <b>${fmt(b[i])} m</b><br>Su: <b>${waterTxt(i,x)}</b>${window.infTip?infTip(i):""}`;
 }
 
 // ================= Döngü =================
