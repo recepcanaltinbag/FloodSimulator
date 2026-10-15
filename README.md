@@ -43,7 +43,7 @@ Kurulum gerekmez; tek bir HTML sayfası ve yardımcı betiklerden oluşur, telef
 - **Akış:** 2B sığ su yaklaşımı ("sanal borular" yöntemi) ve Manning sürtünmesi; 256 × 256 hücrelik pencere (orta boy bölgede hücre ≈ 29 m). LISFLOOD-FP gibi bilimsel modellerin sadeleştirilmiş bir akrabasıdır.
 - **Kayıplar:** zemin sızması (Horton: zemin ıslandıkça azalır; önceki günlerin yağışı seçilebilir, yukarı havzaya da uygulanır), kanalizasyon (toplu kapasite: ızgara çekişi + boru hacmi + deşarj), karst düdenleri ve kapalı çukur yutakları.
 - **Dereler:** OSM dere hatları boyunca arazi alçaltılır (stream burning); köprü tablaları yalnızca görüntüde kalır.
-- **Yukarı havza:** pencere dışında ~115 m'lik kaba arazi üzerinde D8 akış yönleri ve priority-flood; su, yamaçta ~0,5, derede ~1,5 m/s varsayımıyla gecikmeli girer.
+- **Yukarı havza:** pencere dışında ~115 m'lik kaba arazi üzerinde D8 akış yönleri ve priority-flood; su, yamaçta ~0,5, derede ~1,5 m/s varsayımıyla gecikmeli girer. Dışarıda kanalizasyon kaybı düşülmez (ya şebeke yoktur ya da yağmur suyu zaten derelere boşalır); zemin en az "Karışık kentsel" sayılır.
 - **Drenaj alanı:** Rasyonel Yöntem (Q = C·i·A/3,6) ve Kirpich toplanma süresi.
 
 Her şey tarayıcıda, JavaScript ve Three.js ile hesaplanır; sunucu tarafı yoktur.

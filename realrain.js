@@ -134,7 +134,7 @@ if(document.readyState === "loading"){
     else if(FC.none){ chipF.textContent = "🔮 Tahmin · 3 günde yağış yok"; chipF.disabled = true; chipF.title = "Önümüzdeki 3 günde kayda değer yağış beklenmiyor"; }
     else { chipF.textContent = `🔮 Tahmin · ${trDate(FC.date)} ${hh(FC.start)}:00${FC.totals?` · ${fmt(FC.totals.p10,0)}–${fmt(FC.totals.p90,0)} mm`:""}`; chipF.disabled = false; chipF.title = ""; }
     chipD.textContent = `14 Ekim 2026 · 12 saat, saat saat · ~${fmt(DAY.mm.reduce((a,v)=>a+v,0),0)} mm`;
-    chipD.title = "14 Ekim sağanağının bu bölgedeki en yağışlı 12 saati, saat saat: dağılım Open-Meteo modelinden, 24 saatlik toplam yakındaki AKOM ölçümlerine göre ölçeklendi";
+    chipD.title = "Zemin doygun başlar: öncesinde sabahtan beri yağıyordu. 14 Ekim sağanağının bu bölgedeki en yağışlı 12 saati, saat saat: dağılım Open-Meteo modelinden, 24 saatlik toplam yakındaki AKOM ölçümlerine göre ölçeklendi";
     chipD.classList.toggle("on", RR.on && RR.mode==="day");
     chipP.classList.toggle("on", RR.on && RR.mode==="past");
     chipF.classList.toggle("on", RR.on && RR.mode==="fc");
@@ -182,7 +182,8 @@ if(document.readyState === "loading"){
   const restart = () => { resetWater(); S.running = S.loaded; updPlay(); };
   chipP.onclick = () => { use("past"); restart(); };
   chipF.onclick = () => { use("fc"); restart(); };
-  chipD.onclick = () => { use("day"); restart(); };
+  // en yağışlı 12 saatten önce de (sabah, 13 Ekim) yağmur yağıyordu: zemin doygun başlar
+  chipD.onclick = () => { $("ante").value = "sat"; uiUpd(); use("day"); restart(); };
   // başka bir senaryo ya da elle ayar → gerçek veri kapanır
   scen.addEventListener("click", e => { const c=e.target.closest(".chip"); if(c && c!==chipP && c!==chipF && c!==chipD && !c.classList.contains("scenXb")) off(); });
   ["rate","dur"].forEach(id => $(id).addEventListener("input", off));

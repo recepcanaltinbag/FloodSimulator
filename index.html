@@ -220,6 +220,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .pk-go{padding:13px;font-size:15px;border-radius:12px;flex:1}
 .pk-act{position:sticky;top:-18px;z-index:3;display:flex;flex-direction:column;gap:8px;margin:-4px -18px 0;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 8px 12px -10px rgba(0,0,0,.6)}
 .pk-btns{display:flex;gap:8px;align-items:center}
+.top .gh{margin-top:2px;font-size:12px}.top .gh a,.note a{color:var(--accent);text-decoration:none}.top .gh a:hover,.note a:hover{text-decoration:underline}
 @media (max-width:900px){.pk-act{top:0}.pk-side{overflow:visible}} /* telefonda kaydıran .pk; yapışma ona göre */
 .pk-close{position:absolute;top:12px;right:12px}
 .pk-tabs{margin-bottom:10px}
@@ -336,6 +337,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 <div class="top">
   <h1>🌧️ Yağış ve Sel Simülasyonu</h1>
   <p class="sub">Uydu yükseklik verisi (SRTM tabanlı DEM) üzerinde yağmur suyunun akışı ve birikmesi.</p>
+  <p class="sub gh"><a href="https://github.com/recepcanaltinbag/FloodSimulator" target="_blank" rel="noopener">GitHub'da kaynak kod ↗</a> · <a href="https://github.com/recepcanaltinbag/FloodSimulator/blob/main/docs/dogrulama-14ekim.md" target="_blank" rel="noopener">Ne kadar doğru? ↗</a></p>
 
   <div class="live">
     <span id="liveSt" class="muted">Yükleniyor…</span>
@@ -374,8 +376,8 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <label style="margin-top:8px">Önceki günler</label>
     <select id="ante">
       <option value="dry">Kuru · zemin suyu iyi emer</option>
-      <option value="wet" selected>Nemli · son günlerde yağmur yağdı</option>
-      <option value="sat">Doygun · uzun süredir yağıyor</option>
+      <option value="wet">Nemli · son günlerde yağmur yağdı</option>
+      <option value="sat" selected>Doygun · uzun süredir yağıyor</option>
     </select>
     <p class="sub" id="soilInfo" style="margin-top:4px"></p>
   </div>
@@ -401,7 +403,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <p class="sub" id="depInfo" style="margin-top:4px"></p>
     <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:10px"><input type="checkbox" id="upOn" checked> 🏞️ Havzadan gelen su <span class="muted" style="font-weight:400">(yukarı havza)</span></label>
     <p class="sub" id="upInfo" style="margin-top:4px"></p>
-    <p class="sub" style="margin-top:4px;font-size:11px">Simülasyon alanının dışında kalan yukarı havzaya düşen yağmurun zemin ve kanalizasyon ayarlarına göre kalan kısmı, dere yataklarından gecikmeli olarak alanın kenarından girer. Kaba yükseklik verisi (~115 m hücre) ve D8 akış yönleriyle hesaplanır; hız yamaçta ~0,5, derede ~1,5 m/s varsayılır. Dışarıdaki kapalı çukurlar (baraj gölü, maden çukuru ya da kaba veride yol dolgusu olabilir) normalde dolu sayılır ve suyu geçirir; karst modunda ya da “Kapalı çukurlar yeraltına boşalsın” açıkken dolana kadar suyu tutar ve her biri en çok 5 m³/s yutar. Dere ıslahı ve kanallar hesaba katılmaz.</p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Simülasyon alanının dışında kalan yukarı havzaya düşen yağmurun zemine sızmayan kısmı (zemin en az “Karışık kentsel” sayılır; kanalizasyon kaybı düşülmez, çünkü dışarıda ya şebeke yoktur ya da yağmur suyu zaten derelere boşalır), dere yataklarından gecikmeli olarak alanın kenarından girer. Kaba yükseklik verisi (~115 m hücre) ve D8 akış yönleriyle hesaplanır; hız yamaçta ~0,5, derede ~1,5 m/s varsayılır. Dışarıdaki kapalı çukurlar (baraj gölü, maden çukuru ya da kaba veride yol dolgusu olabilir) normalde dolu sayılır ve suyu geçirir; karst modunda ya da “Kapalı çukurlar yeraltına boşalsın” açıkken dolana kadar suyu tutar ve her biri en çok 5 m³/s yutar. Dere ıslahı ve kanallar hesaba katılmaz.</p>
     <p class="sub" style="margin-top:4px;font-size:11px">Kapalı çukur analizi: dolgu derinliği ≥ 2 m ve ≥ 5 hücrelik çukurlar OSM göl/baraj verisiyle karşılaştırılır; göl yoksa en alçak hücre yutak olur (5 m³/s). Topografya + OSM çıkarımıdır, jeoloji haritası değildir; DEM hataları yanlış işaret üretebilir.</p>
     <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken zemin “Karstik kireçtaşı” (80 mm/sa) olur ve her düden en çok 5 m³/s su yutar.</p>
   </div>
@@ -441,6 +443,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <p class="note">
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür, ama oraya düşen yağmurun bu alana akan kısmı kaba bir havza modeliyle kenardan girer ("Havzadan gelen su"); kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
+    Kaynak kod, yöntem ve doğrulama: <a href="https://github.com/recepcanaltinbag/FloodSimulator" target="_blank" rel="noopener">github.com/recepcanaltinbag/FloodSimulator</a> (MIT; veriler kendi lisanslarıyla).<br><br>
     Veri: AWS Terrain Tiles (SRTM vd.) · FABDEM v1-2 (Hawker vd. 2022, “A 30 m global map of elevation with forests and buildings removed”, Environ. Res. Lett. 17 024016; University of Bristol, CC BY-NC-SA 4.0; karst/dağ/Kağıthane karoları bu lisansla türetildi) — Copernicus WorldDEM-30 © DLR e.V. 2010-2014 ve © Airbus Defence and Space GmbH 2014-2018, Copernicus programı kapsamında AB ve ESA tarafından sağlanmıştır; tüm hakları saklıdır · isteğe bağlı olarak kullanıcının kendi DEM dosyası (yalnızca tarayıcıda okunur; geotiff.js, proj4js) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
   </p>
 </div>
@@ -535,7 +538,8 @@ const SCEN = [
   // 14 Ekim 2026: Beykoz'da ~24 saatte 242–277 mm (AKOM), 1942'den beri en yüksek günlük değer. Saatlik ölçüm yayımlanmadı;
   // Open-Meteo saatlik model eğrisinde en sert saatler 18:00–21:00 (model 24 saatte 80 mm, AKOM 22:22'de 225,8 mm → ×2,8 ölçekle)
   // bu üç saat ~124 mm, en sert saat ~57 mm. Burada o üç saat: 40 mm/sa · 3 sa
-  {n:"14 Ekim 2026 · en sert 3 saat", r:40, d:3, t:"14 Ekim 2026 akşamı Beykoz, 18:00–21:00 · yaklaşık 120 mm (en sert saatte ~55 mm). Günün tamamında 242–277 mm düştü (AKOM). Saatlik değerler model eğrisinin ölçümle ölçeklenmesinden tahmindir"},
+  // 14 Ekim'de sabahtan (ve 13 Ekim'den) beri yağıyordu: zemin bu saatlere doygun girdi → "Önceki günler: Doygun"
+  {n:"14 Ekim 2026 · en sert 3 saat", r:40, d:3, ante:"sat", t:"Zemin doygun başlar: sabahtan beri yağıyordu. 14 Ekim 2026 akşamı Beykoz, 18:00–21:00 · yaklaşık 120 mm (en sert saatte ~55 mm). Günün tamamında 242–277 mm düştü (AKOM). Saatlik değerler model eğrisinin ölçümle ölçeklenmesinden tahmindir"},
   // aşağıdakiler gizli bölümde: İstanbul'da hiç görülmemiş ya da Türkiye rekoru düzeyinde
   // iklim değişikliği: ısınan hava ~%7/°C daha fazla nem taşır, kısa süreli sağanaklarda artış daha da yüksek olabilir;
   // +2–3 °C ısınmada 2009 Ayamama yağışının ~%30 daha şiddetlisi
@@ -567,7 +571,7 @@ const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 const SOILS = {"0":{f0:0,fc:0,k:2}, "2":{f0:6,fc:1,k:4}, "8":{f0:30,fc:3,k:2}, "25":{f0:75,fc:10,k:2}, "80":{f0:150,fc:60,k:1}};
 const ANTE = {dry:0, wet:1, sat:3};   // başlangıç ıslaklığı (x): kuru, nemli (kapasite ~%37'ye inmiş), doygun (~%5)
 const infCap = () => S.soil.fc + (S.soil.f0 - S.soil.fc)*Math.exp(-S.wetX);
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:1, wetX:1, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:3, wetX:3, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -720,7 +724,7 @@ SCEN.forEach(s=>{
   const c=document.createElement("button"); c.className="chip"+(s.x?" xs":""); c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
   if(s.t) c.title=s.t;
   if(s.n==="14 Ekim 2026 · en sert 3 saat") c.classList.add("on"); // varsayılan senaryo
-  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; uiUpd(); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
+  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; if(s.ante) $("ante").value=s.ante; uiUpd(); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
   (s.x?scenX:$("scen")).appendChild(c);
 });
 $("scen").append(scenXb, scenX);
@@ -1621,11 +1625,14 @@ function upReplay(from){ // geçmiş yağış fazlasını yeni havzayla baştan 
   const rem=from>=UP.tick ? Math.max(0,Math.min(1,(UP.tick*UP_DT-S.simT)/UP_DT)) : 0;
   R.cls.forEach((q,c)=>{ const o=UP.tick?R.out[c]:0; if(q){ q.pend=back[c]+o*rem; q.rate=(back[c]+o)/UP_DT; } else R.lost+=back[c]; });
 }
-function upTick(){ // her UP_DT saniyede bir: dış alanın yağış fazlası (aynı zemin/kanalizasyon ayarları) ve yönlendirme
-  const t=UP.tick++, s=UP_DT/3.6e6, sw=S.sewer;
-  let a=Math.max(0,(t*UP_DT<S.durH*3600?S.rate:0)-S.inf)*s;
-  const tk=Math.min(a,sw.rate*(1-S.block/100)*s,Math.max(0,sw.store/1000-UP.so)+sw.out*s);
-  a-=tk; UP.so=Math.max(0,UP.so+tk-sw.out*s);
+// Yukarı havza zemini: büyük kısmı orman/kırsal ya da karışık; pencere "Beton / asfalt" seçilse bile dışarısı
+// "Karışık kentsel" sayılır (daha geçirgen seçimler ve "hiç emmesin" olduğu gibi kalır). Islaklık penceredekiyle aynı.
+const upInf = () => { const p = S.soilV==="2" ? SOILS["8"] : S.soil; return p.fc + (p.f0-p.fc)*Math.exp(-S.wetX); };
+function upTick(){ // her UP_DT saniyede bir: dış alanın yağış fazlası ve yönlendirme
+  // Kanalizasyon kaybı uygulanmaz: dışarıda şebeke ya yok (orman, köy) ya da yağmur suyu zaten derelere boşalır,
+  // yani dereden aşağı gelen suyu azaltmaz. Yalnızca zemin sızması (Horton) düşülür.
+  const t=UP.tick++, s=UP_DT/3.6e6;
+  let a=Math.max(0,(t*UP_DT<S.durH*3600?S.rate:0)-upInf())*s;
   UP.eH[t]=a; UP.sH[t]=(SINK||KARST.on)?1:0;
   const R=UP.R; if(!R||!UP.on) return;
   upRoute(t);
