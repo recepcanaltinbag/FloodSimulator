@@ -342,11 +342,11 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="chips" id="scen" style="margin-bottom:10px"></div>
   <div class="ctrl">
     <label>Yağış şiddeti <span id="rateV"></span></label>
-    <input type="range" id="rate" min="5" max="300" step="5" value="200">
+    <input type="range" id="rate" min="5" max="200" step="5" value="100">
   </div>
   <div class="ctrl">
     <label>Yağış süresi <span id="durV"></span></label>
-    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="6">
+    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="2">
   </div>
   <div class="ctrl">
     <label>Zemin (suyu emme)</label>
@@ -507,8 +507,8 @@ const SCEN = [
   {n:"Kuvvetli yağış", r:20, d:1},
   {n:"Sağanak", r:50, d:2},
   {n:"Aşırı sağanak", r:80, d:4},
-  {n:"Abartılı (görsel)", r:200, d:6},
-  {n:"Rekor (300 mm/sa)", r:300, d:2},
+  {n:"Abartılı (görsel)", r:100, d:2},
+  {n:"Uç değer", r:150, d:1},
 ];
 // rate: ızgaraların yüzeyden alabildiği su (mm/sa), store: boru hacmi (mm, alan geneli), out: arıtma/denize deşarj (mm/sa)
 const SEWERS = {
@@ -527,7 +527,7 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:200, durH:6, inf:8, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:100, durH:2, inf:8, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
