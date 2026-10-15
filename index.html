@@ -351,11 +351,11 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="chips" id="scen" style="margin-bottom:10px"></div>
   <div class="ctrl">
     <label>Yağış şiddeti <span id="rateV"></span></label>
-    <input type="range" id="rate" min="5" max="200" step="5" value="45">
+    <input type="range" id="rate" min="5" max="200" step="5" value="40">
   </div>
   <div class="ctrl">
     <label>Yağış süresi <span id="durV"></span></label>
-    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="4">
+    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="3">
   </div>
   <div class="ctrl">
     <label>Zemin (suyu emme)</label>
@@ -549,7 +549,7 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:45, durH:4, inf:8, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:8, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -701,7 +701,7 @@ scenXb.onclick=()=>{ scenX.hidden=!scenX.hidden; scenXb.textContent=`⚠ Aşır�
 SCEN.forEach(s=>{
   const c=document.createElement("button"); c.className="chip"+(s.x?" xs":""); c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
   if(s.t) c.title=s.t;
-  if(s.n==="2009 Ayamama seli") c.classList.add("on"); // varsayılan senaryo
+  if(s.n==="14 Ekim 2026 · en sert 3 saat") c.classList.add("on"); // varsayılan senaryo
   c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; uiUpd(); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
   (s.x?scenX:$("scen")).appendChild(c);
 });
@@ -2557,7 +2557,7 @@ async function mmSearch(){
 }
 addEventListener("keydown",e=>{ if(e.key==="Escape" && MM.on && $("picker").hidden && document.activeElement!==$("mmQ")) $("mmBack").click(); });
 
-// İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, 2009 Ayamama yağışı) yüklenir ve yağmur kendiliğinden başlar
+// İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, 14 Ekim 2026 yağışı) yüklenir ve yağmur kendiliğinden başlar
 loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 </script>
 <script>
