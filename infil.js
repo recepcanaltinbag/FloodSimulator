@@ -51,7 +51,7 @@
   const M=window.INFM={ok:false,built:0,fc:null,dd:null,cls:null,reg:null,gen:0,mean:{f0:NODATA.f0,fc:NODATA.fc,k:K},cov:0,z12:0,
                        up:null,upGeo:null,busy:false,wx:null,wxReg:null,acc:null,
                        expL:Float32Array.from({length:2049},(_,k)=>Math.exp(-k/256))}; // e^−x tablosu, x = 0…8
-  const xAt=i=>M.wx&&M.wxReg===REG?M.wx[i]:S.wetX;           // hücrenin ıslaklığı (yoksa pencere ortak değeri)
+  const xAt=i=>S.soilV==="map"&&M.wx&&M.wxReg===REG?M.wx[i]:S.wetX; // hücrenin ıslaklığı (tek zeminde pencere ortak değeri)
   const capAt=i=>M.fc[i]+M.dd[i]*Math.exp(-xAt(i));
   function meanCap(){ let s=0,n=0; for(let i=0;i<N*N;i++){ if(sea[i]) continue; s+=capAt(i); n++; } return n?s/n:infCap(); }
   let IDX=null; const TC=new Map();
