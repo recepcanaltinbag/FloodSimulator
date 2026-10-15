@@ -3,40 +3,1067 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>İstanbul Yağış Simülasyonları</title>
+<title>İstanbul Sel Simülasyonu</title>
+<meta name="description" content="Uydu yükseklik verisi üzerinde İstanbul için 3B yağış ve sel simülasyonu.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <style>
-:root{--bg:#0d1117;--panel:#161b22;--ink:#e6edf3;--muted:#8b98a5;--line:#2a323c;--accent:#58a6ff}
+:root{--bg:#0b0f15;--panel:#141a22;--panel2:#1b232d;--ink:#e6edf3;--muted:#8b98a5;--line:#28313c;--accent:#4ea8ff;--accent-soft:#16283f;--warn:#ff5c5c;--amber:#ffb020;--cyan:#22e0ff}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px 16px}
-main{max-width:820px;width:100%}
-h1{font-size:28px;margin:0 0 6px}
-p.sub{color:var(--muted);margin:0 0 24px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-a.card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;color:inherit;text-decoration:none;transition:border-color .2s,transform .2s}
-a.card:hover{border-color:var(--accent);transform:translateY(-2px)}
-.card .e{font-size:32px}
-.card h2{margin:8px 0 6px;font-size:19px}
-.card p{margin:0;color:var(--muted);font-size:14px}
-footer{margin-top:24px;color:var(--muted);font-size:12px}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit}
+.wrap{display:grid;grid-template-columns:330px 1fr;height:100vh}
+@media (max-width:900px){.wrap{grid-template-columns:1fr;height:auto}}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:14px 16px;overflow-y:auto}
+h1{font-size:18px;margin:0 0 2px}
+.sub{color:var(--muted);font-size:12px;margin:0}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:18px 0 8px}
+.region{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:12px}
+.region .ic{font-size:22px}
+.region b{display:block}
+.region small{color:var(--muted)}
+.region button{margin-left:auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#04121f}
+.ctrl{margin-bottom:12px}
+.ctrl label{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px;font-size:13px}
+.ctrl label span{color:var(--accent);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.btns{display:flex;gap:8px;margin-top:6px}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer;background:var(--accent);color:#04121f}
+.btns .btn{flex:1}
+.btn.ghost{background:var(--accent-soft);color:var(--accent)}
+.btn.sm{padding:6px 10px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+.main{position:relative;display:flex;flex-direction:column;min-height:0}
+#view{flex:1;min-height:440px;position:relative;overflow:hidden}
+#view canvas{display:block}
+.overlay{position:absolute;inset:0;display:none;flex-direction:column;gap:10px;align-items:center;justify-content:center;background:rgba(11,15,21,.8);font-size:15px;z-index:5}
+.progress{width:260px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.hud{position:absolute;left:12px;top:12px;background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;backdrop-filter:blur(6px);max-width:calc(100% - 320px)}
+@media (max-width:700px){.hud{max-width:none;right:12px}}
+.hud b{font-size:15px}
+.legend{position:absolute;left:12px;bottom:12px;background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:11px;backdrop-filter:blur(6px)}
+.legend .bar{width:150px;height:9px;border-radius:4px;background:linear-gradient(90deg,rgb(150,210,255),rgb(60,140,240),rgb(10,40,140));margin:4px 0}
+.legend .ticks{display:flex;justify-content:space-between;color:var(--muted)}
+.legend .row{display:flex;align-items:center;gap:6px;margin-top:4px}
+.sw{width:16px;height:3px;border-radius:2px;display:inline-block}
+#tip{position:absolute;pointer-events:none;background:rgba(0,0,0,.82);border-radius:6px;padding:5px 8px;font-size:12px;display:none;white-space:nowrap;z-index:4}
+.nav{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:3}
+.nav button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:rgba(11,15,21,.8);color:var(--ink);font-size:17px;cursor:pointer;backdrop-filter:blur(6px)}
+.nav button:hover{border-color:var(--accent)}
+.help{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:11.5px;color:var(--muted);white-space:nowrap;pointer-events:none}
+@media (max-width:1100px){.help{display:none}}
+.panel{position:absolute;right:12px;top:12px;width:290px;max-height:calc(100% - 24px);overflow-y:auto;background:rgba(11,15,21,.8);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;backdrop-filter:blur(6px);z-index:3}
+@media (max-width:700px){.panel{position:static;width:auto;margin:8px}}
+.panel .ph{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;margin-bottom:6px}
+.panel .ph small{font-weight:400;color:var(--muted)}
+.panel label{display:flex;gap:6px;align-items:center;margin:3px 0;cursor:pointer}
+.compare{margin:8px 0;display:grid;gap:6px}
+.cmp .t{display:flex;justify-content:space-between}
+.cmp .g{height:7px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:2px}
+.cmp .g i{display:block;height:100%;width:0;transition:width .4s}
+.big{font-size:13px;margin:6px 0;padding:6px 8px;border-radius:8px;background:var(--accent-soft)}
+.panel ol{margin:6px 0 0;padding-left:18px}
+.panel ol li{margin:2px 0}
+.panel ol li span{color:var(--muted)}
+.muted{color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
+@media (max-width:1100px){.stats{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat .k{font-size:11px;color:var(--muted)}
+.stat .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.gauge{height:5px;border-radius:3px;background:var(--line);margin-top:3px;overflow:hidden}
+.gauge i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.lbls{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:13px}
+.lbls label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.lbls label small{color:var(--muted)}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.lb{position:absolute;left:0;top:0;transform-origin:50% 100%;white-space:nowrap;font-size:11.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 6px rgba(0,0,0,.8);display:none;text-align:center}
+.lb::after{content:"";display:block;width:5px;height:5px;margin:2px auto 0;border-radius:50%;background:#fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.7)}
+.lb.c-suburb{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#f3e7c4}
+.lb.c-suburb::after,.lb.c-road::after{display:none}
+.lb.c-road{font-style:italic;color:#ffe9a8;font-weight:500}
+.note{font-size:11px;color:var(--muted);margin-top:14px}
+
+/* ===== Bölge seçim ekranı ===== */
+#picker{position:fixed;inset:0;z-index:50;background:rgba(5,8,12,.82);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px}
+#picker[hidden]{display:none}
+.pk{width:min(1180px,100%);height:min(760px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;display:grid;grid-template-columns:1fr 360px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+@media (max-width:900px){.pk{grid-template-columns:1fr;grid-template-rows:45vh auto;height:auto;max-height:100%;overflow-y:auto}}
+.pk-map{position:relative;min-height:300px}
+#pmap{position:absolute;inset:0}
+.pk-search{position:absolute;top:12px;left:56px;right:12px;z-index:500;max-width:420px}
+.pk-search input{width:100%;padding:11px 14px 11px 38px;border-radius:12px;border:1px solid var(--line);background:rgba(20,26,34,.95);color:var(--ink);font:inherit;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.pk-search::before{content:"🔍";position:absolute;left:12px;top:10px;font-size:14px}
+.pk-results{margin-top:6px;background:rgba(20,26,34,.97);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pk-results button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line)}
+.pk-results button:hover{background:var(--accent-soft)}
+.pk-hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:500;background:rgba(20,26,34,.92);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12px;color:var(--muted);white-space:nowrap}
+.pk-side{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;border-left:1px solid var(--line)}
+.pk-side h3{margin:0;font-size:20px}
+.pk-side .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pc{position:relative;height:74px;border-radius:12px;overflow:hidden;border:2px solid transparent;cursor:pointer;background:#222 center/cover;text-align:left;padding:0;color:#fff}
+.pc::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 20%,rgba(0,0,0,.8))}
+.pc span{position:absolute;left:8px;right:8px;bottom:6px;z-index:1;font-weight:700;font-size:12.5px;line-height:1.2}
+.pc small{display:block;font-weight:400;font-size:10.5px;opacity:.8}
+.pc.on{border-color:var(--accent)}
+.pc:hover{border-color:rgba(78,168,255,.6)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:var(--ink);padding:7px 4px;border-radius:8px;cursor:pointer;font-size:12px;line-height:1.2}
+.seg button small{display:block;color:var(--muted);font-size:10.5px}
+.seg button.on{background:var(--panel2);box-shadow:0 1px 3px rgba(0,0,0,.4);font-weight:600}
+.pk-sel{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
+.pk-sel b{font-size:15px}
+.pk-go{padding:13px;font-size:15px;border-radius:12px}
+.pk-close{position:absolute;top:12px;right:12px}
+.leaflet-container{background:#111;font:inherit}
+.leaflet-tooltip{font-size:12px}
 </style>
 </head>
 <body>
-<main>
-  <h1>🌧️ İstanbul Yağış Simülasyonları</h1>
-  <p class="sub">Yağmurun metrekareye ne kadar su bıraktığını ve gerçek arazide nasıl aktığını görün.</p>
-  <div class="grid">
-    <a class="card" href="sel-3d.html">
-      <div class="e">🗺️</div>
-      <h2>3B sel simülasyonu</h2>
-      <p>Uydu yükseklik verisi ve uydu görüntüsü üzerinde yağmur suyunun akışı. Bölge, yağış, zemin ve kanalizasyon sistemi seçilebilir.</p>
-    </a>
-    <a class="card" href="metrekare.html">
-      <div class="e">🪣</div>
-      <h2>Metrekareye düşen yağış</h2>
-      <p>1 m²'lik depoda yağış şiddeti, aylık ve yıllık ortalamalara göre biriken su, litre ve kova karşılıkları.</p>
-    </a>
+
+<!-- ============ Bölge seçim ekranı ============ -->
+<div id="picker">
+  <div class="pk">
+    <div class="pk-map">
+      <div id="pmap"></div>
+      <div class="pk-search">
+        <input id="q" placeholder="Semt, cadde ya da dere ara… (ör. Kağıthane)" autocomplete="off">
+        <div class="pk-results" id="qres" hidden></div>
+      </div>
+      <div class="pk-hint">Haritaya tıkla ya da kareyi sürükle → simülasyon alanı</div>
+    </div>
+    <div class="pk-side">
+      <div>
+        <h3>🌧️ Nerede yağsın?</h3>
+        <p class="sub">İstanbul'da bir bölge seç; gerçek yükseklik verisi ve uydu görüntüsüyle 3B olarak açılacak.</p>
+      </div>
+      <div>
+        <div class="lbl">Taşkın riskli bilinen bölgeler</div>
+        <div class="cards" id="cards"></div>
+      </div>
+      <div>
+        <div class="lbl">Alan büyüklüğü</div>
+        <div class="seg" id="segSize"></div>
+      </div>
+      <div>
+        <div class="lbl">Uydu görüntü kalitesi</div>
+        <div class="seg" id="segQ"></div>
+      </div>
+      <div class="pk-sel" id="pkSel"></div>
+      <button class="btn pk-go" id="goBtn">Bu bölgeyi yükle →</button>
+      <button class="btn ghost sm" id="pkCancel" hidden>Vazgeç</button>
+    </div>
   </div>
-  <footer>Simülasyonlar gösterim amaçlıdır, gerçek taşkın tahmini değildir. Veri: AWS Terrain Tiles (SRTM vd.), Esri World Imagery.</footer>
-</main>
+</div>
+
+<div class="wrap">
+<aside>
+  <h1>🌧️ İstanbul Sel Simülasyonu</h1>
+  <p class="sub">Uydu yükseklik verisi (SRTM tabanlı DEM) üzerinde yağmur suyunun akışı ve birikmesi.</p>
+
+  <div class="region">
+    <div class="ic">📍</div>
+    <div><b id="regName">—</b><small id="regInfo"></small></div>
+    <button class="btn ghost sm" id="openPicker">Değiştir</button>
+  </div>
+
+  <h2>Yağış senaryosu</h2>
+  <div class="chips" id="scen" style="margin-bottom:10px"></div>
+  <div class="ctrl">
+    <label>Yağış şiddeti <span id="rateV"></span></label>
+    <input type="range" id="rate" min="5" max="300" step="5" value="50">
+  </div>
+  <div class="ctrl">
+    <label>Yağış süresi <span id="durV"></span></label>
+    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="3">
+  </div>
+  <div class="ctrl">
+    <label>Zemin (suyu emme)</label>
+    <select id="soil">
+      <option value="2">Beton / asfalt (yoğun kentsel) · 2 mm/sa</option>
+      <option value="8" selected>Karışık kentsel · 8 mm/sa</option>
+      <option value="25">Toprak / orman · 25 mm/sa</option>
+      <option value="0">Hiç emmesin (en kötü durum)</option>
+    </select>
+  </div>
+
+  <h2>Kanalizasyon / yağmur suyu sistemi</h2>
+  <div class="ctrl">
+    <select id="sewer">
+      <option value="none">Yok (hiç drenaj yok)</option>
+      <option value="old">Eski / yetersiz şebeke</option>
+      <option value="std" selected>Standart şebeke (2–5 yıllık yağışa göre)</option>
+      <option value="modern">Modern + yağmur suyu depoları</option>
+    </select>
+    <p class="sub" id="sewerInfo" style="margin-top:6px"></p>
+  </div>
+  <div class="ctrl">
+    <label>Izgara / boru tıkanıklığı <span id="blkV"></span></label>
+    <input type="range" id="blk" min="0" max="90" step="5" value="20">
+  </div>
+  <div class="ctrl">
+    <label>Simülasyon hızı <span id="spdV"></span></label>
+    <input type="range" id="spd" min="0" max="3" step="1" value="3">
+  </div>
+
+  <h2>Görünüm</h2>
+  <div class="ctrl">
+    <label>Yükseklik abartısı <span id="exV"></span></label>
+    <input type="range" id="ex" min="1" max="5" step="0.25" value="1.5">
+  </div>
+  <div class="ctrl">
+    <label>Zemin dokusu</label>
+    <select id="tex">
+      <option value="sat">Uydu görüntüsü</option>
+      <option value="satelev">Uydu + yükseklik renkleri</option>
+      <option value="satroad">Uydu + yollar</option>
+      <option value="elev">Yükseklik renkleri</option>
+    </select>
+  </div>
+
+  <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="flowOn" checked> Akış animasyonu <span class="muted" style="font-weight:400">(suyun aktığı yön)</span></label>
+
+  <h2>Harita etiketleri</h2>
+  <div class="lbls" id="lblToggles"></div>
+
+  <div class="btns">
+    <button class="btn" id="play" disabled>▶ Yağmuru başlat</button>
+    <button class="btn ghost" id="reset" disabled style="flex:0 0 52px">↺</button>
+  </div>
+
+  <p class="note">
+    Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar ve dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
+    Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim
+  </p>
+</aside>
+
+<div class="main">
+  <div id="view">
+    <div class="overlay" id="overlay"><div id="ovText">Bir bölge seç.</div><div class="progress"><i id="ovBar"></i></div></div>
+    <div class="hud" id="hud">—</div>
+    <div class="panel" id="derePanel">
+      <div class="ph">📊 Dere izleri <small>OpenStreetMap</small></div>
+      <label><input type="checkbox" id="showRoads" checked> <span class="sw" style="background:var(--amber)"></span> Adında "dere" geçen yollar</label>
+      <label><input type="checkbox" id="showWater" checked> <span class="sw" style="background:var(--cyan)"></span> Dereler / kanallar</label>
+      <div id="dereBody" class="muted" style="margin-top:6px">Bölge yüklenince gösterilecek.</div>
+    </div>
+    <div class="legend">
+      <div>Su derinliği</div><div class="bar"></div><div class="ticks"><span>5 cm</span><span>1 m</span><span>3 m+</span></div>
+      <div class="row"><span class="sw" style="background:var(--amber)"></span>"Dere" adlı yol (kuru)</div>
+      <div class="row"><span class="sw" style="background:var(--warn)"></span>"Dere" adlı yol (su altında)</div>
+      <div class="row"><span class="sw" style="background:var(--cyan)"></span>Dere / kanal</div>
+    </div>
+    <div id="labels"></div>
+    <div id="tip"></div>
+    <div class="nav">
+      <button id="nNorth" title="Kuzeye çevir">🧭</button>
+      <button id="nIn" title="Yakınlaş">＋</button>
+      <button id="nOut" title="Uzaklaş">－</button>
+      <button id="nTop" title="Tepeden bak">⬇</button>
+      <button id="nHome" title="Başa dön">⌂</button>
+    </div>
+    <div class="help">Sol tık: kaydır · Sağ tık veya Ctrl+sürükle: döndür / eğ · Tekerlek: yakınlaş · Çift tık: oraya uç</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="k">Geçen süre</div><div class="v" id="sT">0 dk</div></div>
+    <div class="stat"><div class="k">Düşen yağış</div><div class="v" id="sR">0 mm</div></div>
+    <div class="stat"><div class="k">Su basan alan (&gt;10 cm)</div><div class="v" id="sA">0 km²</div></div>
+    <div class="stat"><div class="k">En derin nokta</div><div class="v" id="sD">0 m</div></div>
+    <div class="stat"><div class="k">Karadaki su hacmi</div><div class="v" id="sV">0 m³</div></div>
+    <div class="stat"><div class="k">Kanalizasyon doluluğu</div><div class="v" id="sS">—</div><div class="gauge"><i id="gS"></i></div></div>
+    <div class="stat"><div class="k">Kanala giden su</div><div class="v" id="sK">0 m³</div></div>
+  </div>
+</div>
+</div>
+
+<script>
+// ================= Ayarlar =================
+const N = 256, G = 9.81, MANNING = 0.035; // kentsel yüzey pürüzlülüğü
+const PLACES = [
+  {k:"kagithane", n:"Kağıthane Deresi", s:"Kağıthane", lat:41.080, lon:28.975},
+  {k:"ayamama", n:"Ayamama Deresi", s:"Basın Ekspres · Küçükçekmece", lat:41.025, lon:28.805},
+  {k:"kurbagalidere", n:"Kurbağalıdere", s:"Kadıköy", lat:40.988, lon:29.045},
+  {k:"alibeykoy", n:"Alibeyköy Deresi", s:"Eyüpsultan", lat:41.075, lon:28.940},
+  {k:"halic", n:"Haliç / Eminönü", s:"Fatih · Beyoğlu", lat:41.030, lon:28.955},
+  {k:"haramidere", n:"Haramidere", s:"Esenyurt · Beylikdüzü", lat:41.005, lon:28.680},
+  {k:"sariyer", n:"Sarıyer", s:"Boğaz kıyısı", lat:41.165, lon:29.050},
+  {k:"riva", n:"Riva Deresi", s:"Beykoz", lat:41.205, lon:29.215},
+];
+const SIZES = {s:{z:14,t:"Küçük",d:"~3,7 km · en detaylı"}, m:{z:13,t:"Orta",d:"~7,4 km"}, l:{z:12,t:"Geniş",d:"~15 km"}};
+const QUALS = {1:{t:"Hızlı",d:"1024 px"}, 2:{t:"Yüksek",d:"2048 px"}, 3:{t:"En yüksek",d:"4096 px"}};
+const SCEN = [
+  {n:"Kuvvetli yağış", r:20, d:1},
+  {n:"Sağanak", r:50, d:2},
+  {n:"Aşırı sağanak", r:80, d:4},
+  {n:"Abartılı (görsel)", r:200, d:6},
+  {n:"Rekor (300 mm/sa)", r:300, d:2},
+];
+// rate: ızgaraların yüzeyden alabildiği su (mm/sa), store: boru hacmi (mm, alan geneli), out: arıtma/denize deşarj (mm/sa)
+const SEWERS = {
+  none:   {rate:0,  store:0,  out:0,  t:"Su yalnızca yüzeyde akar ve zemine sızar."},
+  old:    {rate:10, store:4,  out:6,  t:"Izgaralar 10 mm/sa çeker, borular çabuk dolar."},
+  std:    {rate:25, store:10, out:15, t:"Izgaralar 25 mm/sa çeker; uzun sağanakta borular dolar."},
+  modern: {rate:45, store:30, out:25, t:"Izgaralar 45 mm/sa çeker; depolar sayesinde büyük hacim tutar."},
+};
+const SPEEDS = [{v:1,t:"1 sn = 1 dk"},{v:5,t:"1 sn = 5 dk"},{v:15,t:"1 sn = 15 dk"},{v:60,t:"maksimum"}];
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+const SAT_URL = (z,x,y)=>`${ESRI}World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+const ROAD_URL = (z,x,y)=>`${ESRI}Reference/World_Transportation/MapServer/tile/${z}/${y}/${x}`;
+const DEM_URL = (z,x,y)=>`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
+
+const $ = id => document.getElementById(id);
+const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
+
+// ================= Durum =================
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, landN:1, rate:50, durH:3, inf:8, speed:60, ex:1.5,
+           running:false, simT:0, rainMM:0, loaded:false, cell:29,
+           lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
+let blendCanvas=null, LABELS=[];
+let b, d, H, fL, fR, fT, fB, sea, satCanvas, roadCanvas, elevCanvas, REG=null, DERE=null;
+
+// ================= Koordinat yardımcıları =================
+function lat2py(lat,n){const r=lat*Math.PI/180;return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n*256;}
+function lon2px(lon,n){return (lon+180)/360*n*256;}
+function px2ll(px,py,n){const lon=px/(n*256)*360-180;const y=Math.PI*(1-2*py/(n*256));return {lat:Math.atan(Math.sinh(y))*180/Math.PI,lon};}
+function regionBounds(lat,lon,size){
+  const n=2**SIZES[size].z, px=lon2px(lon,n), py=lat2py(lat,n);
+  const tl=px2ll(px-256,py-256,n), br=px2ll(px+256,py+256,n);
+  return [[br.lat,tl.lon],[tl.lat,br.lon]];
+}
+function regionKm(lat,size){ return 512*156543.03*Math.cos(lat*Math.PI/180)/2**SIZES[size].z/1000; }
+
+// ================= Bölge seçim ekranı =================
+const P = {lat:S.lat, lon:S.lon, name:S.name, size:S.size, q:S.q};
+const pmap = L.map("pmap",{zoomControl:true,attributionControl:false}).setView([P.lat,P.lon],12);
+L.tileLayer(SAT_URL.length ? `${ESRI}World_Imagery/MapServer/tile/{z}/{y}/{x}` : "",{maxZoom:18}).addTo(pmap);
+L.tileLayer(`${ESRI}Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`,{maxZoom:18}).addTo(pmap);
+const prect = L.rectangle(regionBounds(P.lat,P.lon,P.size),{color:"#4ea8ff",weight:2,fillOpacity:.12,dashArray:"6 4"}).addTo(pmap);
+const dereLayer = L.layerGroup().addTo(pmap);
+
+// kareyi sürükleme
+let dragging=false;
+prect.on("mousedown",e=>{ dragging=true; pmap.dragging.disable(); L.DomEvent.stop(e); });
+pmap.on("mousemove",e=>{ if(dragging) pickSet(e.latlng.lat,e.latlng.lng,"Seçili alan"); });
+pmap.on("mouseup",()=>{ if(dragging){ dragging=false; pmap.dragging.enable(); } });
+pmap.on("click",e=>pickSet(e.latlng.lat,e.latlng.lng,"Seçili alan"));
+
+function pickSet(lat,lon,name,fly){
+  P.lat=lat; P.lon=lon; P.name=name;
+  prect.setBounds(regionBounds(lat,lon,P.size));
+  if(fly) pmap.flyToBounds(prect.getBounds(),{padding:[40,40],duration:.8});
+  document.querySelectorAll(".pc").forEach(c=>c.classList.toggle("on",c.dataset.n===name));
+  updPickInfo();
+}
+function updPickInfo(){
+  const km=regionKm(P.lat,P.size);
+  $("pkSel").innerHTML=`<b>📍 ${P.name}</b><br><span class="muted">${P.lat.toFixed(4)}°K, ${P.lon.toFixed(4)}°D · ${fmt(km,1)} × ${fmt(km,1)} km · hücre ≈ ${fmt(km*1000/256)} m</span>`;
+}
+PLACES.forEach(p=>{
+  const c=document.createElement("button"); c.className="pc"; c.dataset.n=p.n;
+  const n=2**13, tx=Math.floor(lon2px(p.lon,n)/256), ty=Math.floor(lat2py(p.lat,n)/256);
+  c.style.backgroundImage=`url(${SAT_URL(13,tx,ty)})`;
+  c.innerHTML=`<span>${p.n}<small>${p.s}</small></span>`;
+  c.onclick=()=>pickSet(p.lat,p.lon,p.n,true);
+  $("cards").appendChild(c);
+});
+function seg(el,obj,key){
+  Object.entries(obj).forEach(([k,v])=>{
+    const bt=document.createElement("button"); bt.innerHTML=`${v.t}<small>${v.d}</small>`; bt.dataset.k=k;
+    bt.onclick=()=>{ P[key]= key==="q"?+k:k; [...el.children].forEach(x=>x.classList.toggle("on",x===bt)); pickSet(P.lat,P.lon,P.name,key==="size"); };
+    if(String(P[key])===k) bt.classList.add("on");
+    el.appendChild(bt);
+  });
+}
+seg($("segSize"),SIZES,"size"); seg($("segQ"),QUALS,"q");
+pickSet(P.lat,P.lon,P.name);
+
+// arama (Nominatim)
+let qTimer;
+$("q").addEventListener("input",()=>{ clearTimeout(qTimer); qTimer=setTimeout(search,450); });
+$("q").addEventListener("keydown",e=>{ if(e.key==="Enter"){clearTimeout(qTimer);search();} });
+async function search(){
+  const q=$("q").value.trim(); const box=$("qres");
+  if(q.length<3){ box.hidden=true; return; }
+  try{
+    const url=`https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=tr&viewbox=27.95,41.60,29.95,40.75&bounded=1&q=${encodeURIComponent(q)}`;
+    const r=await (await fetch(url)).json();
+    box.innerHTML = r.length ? "" : `<button disabled>Sonuç yok</button>`;
+    r.forEach(it=>{
+      const bt=document.createElement("button");
+      const parts=it.display_name.split(","); bt.innerHTML=`<b>${parts[0]}</b> <span class="muted">${parts.slice(1,3).join(",")}</span>`;
+      bt.onclick=()=>{ box.hidden=true; $("q").value=parts[0]; pickSet(+it.lat,+it.lon,parts[0],true); };
+      box.appendChild(bt);
+    });
+    box.hidden=false;
+  }catch(e){ box.innerHTML=`<button disabled>Arama yapılamadı</button>`; box.hidden=false; }
+}
+
+function openPicker(){ $("picker").hidden=false; $("pkCancel").hidden=!S.loaded; setTimeout(()=>pmap.invalidateSize(),50); }
+$("openPicker").onclick=openPicker;
+$("pkCancel").onclick=()=>$("picker").hidden=true;
+$("goBtn").onclick=()=>{
+  Object.assign(S,{lat:P.lat,lon:P.lon,name:P.name,size:P.size,q:P.q});
+  $("picker").hidden=true; loadRegion();
+};
+
+// ================= Kontroller =================
+SCEN.forEach(s=>{
+  const c=document.createElement("button"); c.className="chip"; c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
+  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; uiUpd(); document.querySelectorAll("#scen .chip").forEach(x=>x.classList.toggle("on",x===c)); };
+  $("scen").appendChild(c);
+});
+function uiUpd(){
+  S.rate=+$("rate").value; S.durH=+$("dur").value; S.inf=+$("soil").value;
+  const sp=SPEEDS[+$("spd").value]; S.speed=sp.v;
+  $("rateV").textContent=S.rate+" mm/saat"; $("durV").textContent=S.durH+" saat → "+fmt(S.rate*S.durH)+" mm";
+  $("spdV").textContent=sp.t;
+  S.sewer=SEWERS[$("sewer").value]; S.block=+$("blk").value;
+  $("blkV").textContent="%"+S.block;
+  const ef=S.sewer.rate*(1-S.block/100);
+  $("sewerInfo").textContent=S.sewer.t+(S.sewer.rate?` Etkin kapasite: ${fmt(ef,1)} mm/sa.`:"");
+  const ex=+$("ex").value; $("exV").textContent=ex+"×";
+  if (ex!==S.ex){ S.ex=ex; if (S.loaded) rebuildTerrainZ(); }
+}
+["rate","dur","soil","spd","ex","sewer","blk"].forEach(id=>$(id).oninput=uiUpd); uiUpd();
+$("tex").onchange=applyTexture;
+$("play").onclick=()=>{ S.running=!S.running; updPlay(); };
+$("reset").onclick=()=>resetWater();
+$("showRoads").onchange=$("showWater").onchange=()=>drawDereOverlay();
+function updPlay(){ $("play").textContent=S.running?"⏸ Duraklat":(S.simT>0?"▶ Devam":"▶ Yağmuru başlat"); }
+
+// ================= Veri yükleme =================
+function loadImg(url){
+  return new Promise((res,rej)=>{const im=new Image();im.crossOrigin="anonymous";im.onload=()=>res(im);im.onerror=()=>rej(url);im.src=url;});
+}
+async function loadTiles(z,cx,cy,size,urlFn,onProg){
+  const x0=cx-size/2, y0=cy-size/2;
+  const tx0=Math.floor(x0/256), ty0=Math.floor(y0/256), tx1=Math.floor((x0+size-1)/256), ty1=Math.floor((y0+size-1)/256);
+  const cnv=document.createElement("canvas"); cnv.width=cnv.height=size;
+  const g=cnv.getContext("2d");
+  const total=(tx1-tx0+1)*(ty1-ty0+1); let done=0;
+  const jobs=[];
+  for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++)
+    jobs.push(loadImg(urlFn(z,tx,ty)).then(im=>{ g.drawImage(im,tx*256-x0,ty*256-y0); onProg&&onProg(++done/total); }));
+  await Promise.all(jobs);
+  return cnv;
+}
+function ov(text,frac){ $("overlay").style.display="flex"; $("ovText").textContent=text; $("ovBar").style.width=((frac||0)*100)+"%"; }
+
+async function loadRegion(){
+  S.running=false; updPlay();
+  $("play").disabled=$("reset").disabled=true;
+  const zd=SIZES[S.size].z, n=2**zd, cx=lon2px(S.lon,n), cy=lat2py(S.lat,n);
+  REG={zd,n,x0:cx-256,y0:cy-256};
+  $("regName").textContent=S.name;
+  $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
+  try{
+    ov("Yükseklik verisi indiriliyor…",0);
+    const demC=await loadTiles(zd,cx,cy,512,DEM_URL,f=>ov("Yükseklik verisi indiriliyor…",f*0.2));
+    const px=demC.getContext("2d").getImageData(0,0,512,512).data;
+    b=new Float32Array(N*N);
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+      let s=0;
+      for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
+        const k=((y*2+dy)*512+(x*2+dx))*4;
+        s+=px[k]*256+px[k+1]+px[k+2]/256-32768;
+      }
+      b[y*N+x]=s/4;
+    }
+    b=smoothDEM(b);
+    S.cell=156543.03*Math.cos(S.lat*Math.PI/180)/n*2;
+    sea=new Uint8Array(N*N); for(let i=0;i<N*N;i++) sea[i]=b[i]<=0.3?1:0;
+    S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
+    elevCanvas=makeElevCanvas();
+
+    const q=Math.min(S.q, Math.log2(maxTex/512));
+    const zs=zd+q, sz=512*2**q, k=2**q;
+    roadCanvas=null; blendCanvas=null;
+    try{
+      const raw=await loadTiles(zs,cx*k,cy*k,sz,SAT_URL,f=>ov(`Uydu görüntüsü indiriliyor… (${sz}×${sz})`,0.2+f*0.75));
+      satCanvas=enhance(raw);
+    }catch(e){ satCanvas=null; $("tex").value="elev"; }
+    REG.zs=zs; REG.sz=sz; REG.k=k; REG.cx=cx; REG.cy=cy;
+
+    ov("Sahne hazırlanıyor…",1);
+    resetWater(); buildScene();
+    S.loaded=true; $("overlay").style.display="none";
+    $("play").disabled=$("reset").disabled=false;
+    loadDere().then(loadLabels);
+  }catch(e){
+    console.error(e); ov("Veri indirilemedi (internet bağlantısını kontrol et).",0);
+  }
+}
+function smoothDEM(a){
+  // 3x3 [1 2 1] filtre: SRTM gürültüsünü ve sahte çukur/sivri noktaları azaltır
+  const o=new Float32Array(N*N), w=[1,2,1];
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    let s=0,ws=0;
+    for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
+      const xx=x+i, yy=y+j; if(xx<0||yy<0||xx>=N||yy>=N) continue;
+      const v=a[yy*N+xx]; if((v<=0.3)!==(a[y*N+x]<=0.3)) continue; // kıyıyı karıştırma
+      const ww=w[i+1]*w[j+1]; s+=v*ww; ws+=ww;
+    }
+    o[y*N+x]=s/ws;
+  }
+  return o;
+}
+function enhance(src){
+  const c=document.createElement("canvas"); c.width=src.width; c.height=src.height;
+  const g=c.getContext("2d"); g.filter="contrast(1.08) saturate(1.18) brightness(1.04)"; g.drawImage(src,0,0);
+  return c;
+}
+function makeElevCanvas(){
+  const c=document.createElement("canvas"); c.width=c.height=N; const g=c.getContext("2d"); const im=g.createImageData(N,N);
+  let mx=1; for(let i=0;i<N*N;i++) if(!sea[i]) mx=Math.max(mx,b[i]);
+  const stops=[[0,[60,120,70]],[0.25,[140,170,90]],[0.5,[200,180,120]],[0.75,[160,120,90]],[1,[240,240,240]]];
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const i=y*N+x, k=i*4;
+    if(sea[i]){im.data.set([25,60,110,255],k);continue;}
+    const t=Math.min(1,b[i]/mx); let c0=stops[0],c1=stops[1];
+    for(let s=1;s<stops.length;s++){ if(t<=stops[s][0]){c0=stops[s-1];c1=stops[s];break;} }
+    const f=(t-c0[0])/(c1[0]-c0[0]||1);
+    const xl=b[y*N+Math.max(0,x-1)], xr=b[y*N+Math.min(N-1,x+1)], yu=b[Math.max(0,y-1)*N+x], yd=b[Math.min(N-1,y+1)*N+x];
+    const sh=Math.max(0.45,Math.min(1.25,1+((xl-xr)+(yu-yd))*0.6/S.cell));
+    for(let j=0;j<3;j++) im.data[k+j]=Math.min(255,(c0[1][j]+(c1[1][j]-c0[1][j])*f)*sh);
+    im.data[k+3]=255;
+  }
+  g.putImageData(im,0,0); return c;
+}
+
+// ================= Dere izleri (OpenStreetMap / Overpass) =================
+function ll2grid(lat,lon){ return [(lon2px(lon,REG.n)-REG.x0)/2, (lat2py(lat,REG.n)-REG.y0)/2]; }
+function hav(a,b){ const R=6371000, t=Math.PI/180, dl=(b.lat-a.lat)*t, dn=(b.lon-a.lon)*t;
+  const h=Math.sin(dl/2)**2+Math.cos(a.lat*t)*Math.cos(b.lat*t)*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+async function loadDere(){
+  DERE=null; dereLayer.clearLayers(); drawDereOverlay();
+  $("dereBody").innerHTML="Yol ve dere verisi indiriliyor…";
+  const [[s,w],[nn,e]]=regionBounds(S.lat,S.lon,S.size);
+  const q=`[out:json][timeout:30];(way["highway"]["name"~"dere",i](${s},${w},${nn},${e});way["waterway"~"^(river|stream|canal|drain|ditch)$"](${s},${w},${nn},${e}););out geom;`;
+  const bk=await baked();
+  const js=bk ? {elements:bk.dere} : await overpass(q);
+  if(!js){ $("dereBody").innerHTML=`OpenStreetMap sunucuları şu an yoğun. <button class="btn ghost sm" onclick="loadDere().then(loadLabels)">Tekrar dene</button>`; return; }
+  const roads=[], ways=[];
+  for(const el of js.elements){
+    if(!el.geometry) continue;
+    const pts=el.geometry.map(p=>({lat:p.lat,lon:p.lon,g:ll2grid(p.lat,p.lon)}));
+    const isRoad=!!el.tags.highway;
+    const item={name:el.tags.name||(isRoad?"(isimsiz)":el.tags.waterway), pts, tunnel:el.tags.tunnel==="culvert"||el.tags.tunnel==="yes"||el.tags.covered==="yes"};
+    if(isRoad){
+      // yol üzerinde örnek hücreler (yarım hücre aralıkla) ve uzunluk
+      const cells=[]; let len=0;
+      for(let i=1;i<pts.length;i++){
+        const a=pts[i-1], c=pts[i], steps=Math.max(1,Math.ceil(Math.hypot(c.g[0]-a.g[0],c.g[1]-a.g[1])*2));
+        const L=hav(a,c);
+        for(let j=0;j<steps;j++){
+          const t=(j+0.5)/steps, gx=Math.round(a.g[0]+(c.g[0]-a.g[0])*t), gy=Math.round(a.g[1]+(c.g[1]-a.g[1])*t);
+          if(gx<0||gy<0||gx>=N||gy>=N) continue;
+          const ci=gy*N+gx; if(sea[ci]) continue;
+          cells.push(ci); len+=L/steps;
+        }
+      }
+      if(!cells.length) continue;
+      item.cells=cells; item.len=len; roads.push(item);
+      L.polyline(pts.map(p=>[p.lat,p.lon]),{color:"#ffb020",weight:3}).bindTooltip(item.name).addTo(dereLayer);
+    } else {
+      if(!pts.some(p=>p.g[0]>=0&&p.g[1]>=0&&p.g[0]<N&&p.g[1]<N)) continue;
+      ways.push(item);
+      L.polyline(pts.map(p=>[p.lat,p.lon]),{color:"#22e0ff",weight:2,dashArray:item.tunnel?"4 4":null}).bindTooltip(item.name+(item.tunnel?" (kapalı/yer altı)":"")).addTo(dereLayer);
+    }
+  }
+  DERE={roads,ways};
+  drawDereOverlay(); updDereStats();
+}
+
+// ================= Önemli yer etiketleri (OpenStreetMap) =================
+const LCATS = {
+  suburb:{t:"Semtler",       ic:"",   pr:0, on:true},
+  square:{t:"Meydanlar",     ic:"⛲", pr:1, on:true},
+  monument:{t:"Anıt / heykel", ic:"🗿", pr:2, on:true},
+  tourism:{t:"Turistik yerler", ic:"📸", pr:2, on:true},
+  worship:{t:"Camiler / ibadet", ic:"🕌", pr:3, on:true},
+  road:{t:"Ana caddeler",    ic:"",   pr:4, on:true},
+};
+Object.entries(LCATS).forEach(([k,c])=>{
+  const l=document.createElement("label");
+  l.innerHTML=`<input type="checkbox" ${c.on?"checked":""}> ${c.ic} ${c.t} <small id="lc-${k}"></small>`;
+  l.querySelector("input").onchange=e=>{ c.on=e.target.checked; };
+  $("lblToggles").appendChild(l);
+});
+function lcat(t){
+  if(t.place==="square") return "square";
+  if(t.place) return "suburb";
+  if(t.historic) return "monument";
+  if(t.tourism) return "tourism";
+  if(t.amenity==="place_of_worship") return "worship";
+  if(t.highway) return "road";
+  return null;
+}
+async function loadLabels(){
+  LABELS.forEach(l=>l.el.remove()); LABELS=[];
+  Object.keys(LCATS).forEach(k=>$("lc-"+k).textContent="");
+  const [[s,w],[nn,e]]=regionBounds(S.lat,S.lon,S.size), bb=`(${s},${w},${nn},${e})`;
+  const q=`[out:json][timeout:30];(
+    node["place"~"^(suburb|neighbourhood|quarter)$"]["name"]${bb};
+    nwr["place"="square"]["name"]${bb};
+    nwr["historic"~"^(monument|memorial)$"]["name"]${bb};
+    nwr["tourism"~"^(attraction|museum|viewpoint)$"]["name"]${bb};
+    nwr["amenity"="place_of_worship"]["name"]["wikidata"]${bb};
+    way["highway"~"^(motorway|trunk|primary)$"]["name"]${bb};
+  );out center tags;`;
+  const bk=await baked();
+  const js=bk ? {elements:bk.labels} : await overpass(q); if(!js) return;
+  const seen=new Set(), cnt={};
+  for(const el of js.elements){
+    const t=el.tags||{}, name=t["name:tr"]||t.name, cat=lcat(t);
+    const lat=el.lat??el.center?.lat, lon=el.lon??el.center?.lon;
+    if(!name||!cat||lat==null) continue;
+    const key=cat+name; if(seen.has(key)) continue; seen.add(key);
+    const g=ll2grid(lat,lon); if(g[0]<1||g[1]<1||g[0]>N-2||g[1]>N-2) continue;
+    const el2=document.createElement("div"); el2.className="lb c-"+cat;
+    el2.textContent=(LCATS[cat].ic?LCATS[cat].ic+" ":"")+name;
+    $("labels").appendChild(el2);
+    LABELS.push({cat,name,g,el:el2,pr:LCATS[cat].pr+(t.wikidata?0:0.5),w:0,h:0});
+    cnt[cat]=(cnt[cat]||0)+1;
+  }
+  LABELS.sort((a,b)=>a.pr-b.pr);
+  LABELS.forEach(l=>{ l.el.style.display="block"; l.w=l.el.offsetWidth; l.h=l.el.offsetHeight; l.el.style.display="none"; });
+  Object.entries(cnt).forEach(([k,v])=>$("lc-"+k).textContent=v);
+}
+const _v=new THREE.Vector3();
+function updateLabels(){
+  if(!LABELS.length||!b) return;
+  const W=view.clientWidth, Hh=view.clientHeight, k=sc()*S.ex, placed=[], dist=camera.position.distanceTo(controls.target);
+  for(const l of LABELS){
+    let show=LCATS[l.cat].on && !(l.pr>=3 && dist>260) && !(l.pr>=2 && dist>420);
+    if(show){
+      const gx=Math.round(l.g[0]), gy=Math.round(l.g[1]), i=gy*N+gx;
+      _v.set((l.g[0]/(N-1)-.5)*SIZE, Math.max(0,b[i]+(d?d[i]:0))*k+0.4, (l.g[1]/(N-1)-.5)*SIZE).project(camera);
+      if(_v.z>1||_v.x<-1.1||_v.x>1.1||_v.y<-1.1||_v.y>1.1) show=false;
+      else{
+        const x=(_v.x+1)/2*W-l.w/2, y=(1-_v.y)/2*Hh-l.h;
+        const r=[x-3,y-2,x+l.w+3,y+l.h+2];
+        for(const q of placed){ if(r[0]<q[2]&&r[2]>q[0]&&r[1]<q[3]&&r[3]>q[1]){show=false;break;} }
+        if(show){ placed.push(r); l.el.style.transform=`translate(${x}px,${y}px)`; }
+      }
+    }
+    l.el.style.display=show?"block":"none";
+  }
+}
+const OVERPASS=["https://overpass.kumi.systems/api/interpreter","https://overpass-api.de/api/interpreter","https://overpass.private.coffee/api/interpreter"];
+// Hazır bölgeler için önceden indirilmiş OSM verisi (data/*.json) — Overpass yoğunken de çalışsın
+let BAKED=null;
+async function baked(){
+  const p=PLACES.find(p=>p.n===S.name && Math.abs(p.lat-S.lat)<1e-6 && Math.abs(p.lon-S.lon)<1e-6);
+  if(!p) return null;
+  if(BAKED && BAKED.k===p.k) return BAKED.js;
+  try{ const r=await fetch(`data/${p.k}.json`); if(!r.ok) return null; BAKED={k:p.k,js:await r.json()}; return BAKED.js; }catch(e){ return null; }
+}
+async function overpass(q){
+  for(let round=0;round<2;round++){
+  if(round) await new Promise(r=>setTimeout(r,4000));
+  for(const ep of OVERPASS){
+    const ac=new AbortController(), tm=setTimeout(()=>ac.abort(),25000);
+    try{ const r=await fetch(ep+"?data="+encodeURIComponent(q),{signal:ac.signal}); if(r.ok){ clearTimeout(tm); return await r.json(); } }catch(e){}
+    clearTimeout(tm);
+  }}
+  return null;
+}
+
+// ================= Simülasyon (virtual pipes) =================
+function resetWater(){
+  if(!b) return;
+  d=new Float32Array(N*N); H=new Float32Array(N*N);
+  fL=new Float32Array(N*N); fR=new Float32Array(N*N); fT=new Float32Array(N*N); fB=new Float32Array(N*N);
+  for(let i=0;i<N*N;i++) if(sea[i]) d[i]=-b[i];
+  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.running=false; updPlay(); updStats();
+  if(waterMesh){ updateWaterMesh(); drawDereOverlay(); }
+}
+function simStep(dt){
+  const l=S.cell, l2=l*l, C=dt*G*l, MN=dt*G*MANNING*MANNING/l;
+  for(let i=0;i<N*N;i++) H[i]=b[i]+d[i];
+  for(let y=0;y<N;y++){
+    for(let x=0;x<N;x++){
+      const i=y*N+x;
+      if(sea[i]||d[i]<=0){fL[i]=fR[i]=fT[i]=fB[i]=0;continue;}
+      const h=H[i];
+      // Manning sürtünmesi (örtük): v = Q/(l·h), sürtünme ∝ g n² v / h^(4/3)
+      const dep=d[i]>0.005?d[i]:0.005, fc=MN/(dep*Math.pow(dep,4/3));
+      const hl= x>0?H[i-1]:b[i], hr= x<N-1?H[i+1]:b[i], ht= y>0?H[i-N]:b[i], hb= y<N-1?H[i+N]:b[i];
+      let a=fL[i]/(1+fc*fL[i])+C*(h-hl); a=a>0?a:0;
+      let r=fR[i]/(1+fc*fR[i])+C*(h-hr); r=r>0?r:0;
+      let t=fT[i]/(1+fc*fT[i])+C*(h-ht); t=t>0?t:0;
+      let bb=fB[i]/(1+fc*fB[i])+C*(h-hb); bb=bb>0?bb:0;
+      const sum=a+r+t+bb;
+      if(sum>0){ const K=Math.min(1,d[i]*l2/(sum*dt)); a*=K;r*=K;t*=K;bb*=K; }
+      fL[i]=a;fR[i]=r;fT[i]=t;fB[i]=bb;
+    }
+  }
+  const raining = S.simT < S.durH*3600;
+  const rain = raining ? S.rate/1000/3600*dt : 0;
+  const inf = S.inf/1000/3600*dt;
+  const sw=S.sewer, toM=dt/1000/3600;
+  const outStep=sw.out*toM, storeM=sw.store/1000;
+  const allow=Math.min(sw.rate*(1-S.block/100)*toM, Math.max(0,storeM-S.stored)+outStep);
+  let taken=0;
+  for(let y=0;y<N;y++){
+    for(let x=0;x<N;x++){
+      const i=y*N+x;
+      if(sea[i]) continue;
+      let inflow=0;
+      if(x>0) inflow+=fR[i-1];
+      if(x<N-1) inflow+=fL[i+1];
+      if(y>0) inflow+=fB[i-N];
+      if(y<N-1) inflow+=fT[i+N];
+      const out=fL[i]+fR[i]+fT[i]+fB[i];
+      let nd=d[i]+dt*(inflow-out)/l2+rain-inf;
+      if(allow>0 && nd>0){ const tk=nd<allow?nd:allow; nd-=tk; taken+=tk; }
+      d[i]=nd>0?nd:0;
+    }
+  }
+  S.stored+=taken/S.landN; S.drained+=taken*S.cell*S.cell;
+  S.stored=Math.max(0,S.stored-outStep);
+  S.simT+=dt; if(raining) S.rainMM+=S.rate*dt/3600;
+}
+
+// ================= 3B sahne =================
+const view=$("view");
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2();
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+renderer.outputEncoding=THREE.sRGBEncoding;
+const maxTex=Math.min(4096,renderer.capabilities.maxTextureSize);
+view.appendChild(renderer.domElement);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0b0f15);
+scene.fog=new THREE.Fog(0x0b0f15,380,760);
+const camera=new THREE.PerspectiveCamera(45,1,0.5,2000);
+camera.position.set(0,140,180);
+// Google Earth tarzı: sol tık kaydır, sağ tık / Ctrl+sürükle döndür-eğ, tekerlek yakınlaş, çift tık uç
+const controls=new THREE.MapControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.08; controls.screenSpacePanning=false;
+controls.maxPolarAngle=Math.PI*0.47; controls.minDistance=6; controls.maxDistance=500;
+controls.zoomSpeed=1.2; controls.rotateSpeed=0.6;
+let fly=null;
+function flyTo(target,dist){
+  const dir=camera.position.clone().sub(controls.target).normalize();
+  fly={t:0,fromT:controls.target.clone(),toT:target.clone(),fromP:camera.position.clone(),toP:target.clone().add(dir.multiplyScalar(dist))};
+}
+renderer.domElement.addEventListener("dblclick",e=>{
+  if(!terrainMesh) return;
+  const r=renderer.domElement.getBoundingClientRect();
+  mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObject(terrainMesh)[0];
+  if(hit) flyTo(hit.point,Math.max(12,camera.position.distanceTo(controls.target)*0.5));
+});
+// Ctrl / Shift + sol tık = döndür (Google Earth gibi)
+renderer.domElement.addEventListener("pointerdown",e=>{
+  controls.mouseButtons.LEFT = (e.ctrlKey||e.shiftKey||e.metaKey) ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
+},true);
+scene.add(new THREE.HemisphereLight(0xffffff,0x445566,0.75));
+const sun=new THREE.DirectionalLight(0xffffff,0.55); sun.position.set(-100,200,80); scene.add(sun);
+
+const SIZE=200;
+let terrainMesh, waterMesh, waterTex, waterData, terrainTex, dereMesh, dereTex, dereCanvas;
+function sc(){ return SIZE/(N*S.cell); }
+
+function buildScene(){
+  [terrainMesh,waterMesh,dereMesh].forEach(m=>{ if(m){scene.remove(m);} });
+  if(terrainMesh) terrainMesh.geometry.dispose();
+  if(waterMesh) waterMesh.geometry.dispose();
+  const tg=new THREE.PlaneGeometry(SIZE,SIZE,N-1,N-1);
+  terrainMesh=new THREE.Mesh(tg,new THREE.MeshLambertMaterial({color:0xffffff}));
+  terrainMesh.rotation.x=-Math.PI/2; scene.add(terrainMesh);
+  applyTexture();
+
+  // dere katmanı: aynı geometri, şeffaf doku
+  dereCanvas=document.createElement("canvas"); dereCanvas.width=dereCanvas.height=1024;
+  dereTex=new THREE.CanvasTexture(dereCanvas); dereTex.encoding=THREE.sRGBEncoding; dereTex.anisotropy=8;
+  dereMesh=new THREE.Mesh(tg,new THREE.MeshBasicMaterial({map:dereTex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+  dereMesh.rotation.x=-Math.PI/2; dereMesh.renderOrder=2; scene.add(dereMesh);
+
+  const wg=new THREE.PlaneGeometry(SIZE,SIZE,N-1,N-1);
+  waterData=new Uint8Array(N*N*4);
+  waterTex=new THREE.DataTexture(waterData,N,N,THREE.RGBAFormat);
+  waterTex.magFilter=THREE.LinearFilter; waterTex.minFilter=THREE.LinearFilter;
+  waterMesh=new THREE.Mesh(wg,new THREE.MeshPhongMaterial({map:waterTex,transparent:true,depthWrite:false,shininess:80,specular:0x333333}));
+  waterMesh.rotation.x=-Math.PI/2; waterMesh.renderOrder=1; scene.add(waterMesh);
+  rebuildTerrainZ(); drawDereOverlay();
+  controls.target.set(0,0,0); camera.position.set(0,140,180);
+}
+function rebuildTerrainZ(){
+  const p=terrainMesh.geometry.attributes.position, k=sc()*S.ex;
+  for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k);
+  p.needsUpdate=true; terrainMesh.geometry.computeVertexNormals();
+  updateWaterMesh();
+}
+async function applyTexture(){
+  if(!terrainMesh) return;
+  const mode=$("tex").value;
+  let src=elevCanvas;
+  if(mode!=="elev" && satCanvas) src=satCanvas;
+  if(mode==="satelev" && satCanvas){
+    if(!blendCanvas){
+      blendCanvas=document.createElement("canvas"); blendCanvas.width=blendCanvas.height=satCanvas.width;
+      const g=blendCanvas.getContext("2d"); g.drawImage(satCanvas,0,0);
+      g.globalAlpha=0.5; g.imageSmoothingQuality="high"; g.drawImage(elevCanvas,0,0,blendCanvas.width,blendCanvas.height);
+    }
+    src=blendCanvas;
+  }
+  if(mode==="satroad" && satCanvas){
+    if(!roadCanvas){
+      try{
+        ov("Yol katmanı indiriliyor…",0);
+        const roads=await loadTiles(REG.zs,REG.cx*REG.k,REG.cy*REG.k,REG.sz,ROAD_URL,f=>ov("Yol katmanı indiriliyor…",f));
+        roadCanvas=document.createElement("canvas"); roadCanvas.width=roadCanvas.height=REG.sz;
+        const g=roadCanvas.getContext("2d"); g.drawImage(satCanvas,0,0); g.drawImage(roads,0,0);
+      }catch(e){ roadCanvas=null; }
+      $("overlay").style.display="none";
+    }
+    if(roadCanvas) src=roadCanvas;
+  }
+  if(terrainTex) terrainTex.dispose();
+  terrainTex=new THREE.CanvasTexture(src); terrainTex.encoding=THREE.sRGBEncoding;
+  terrainTex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  terrainMesh.material.map=terrainTex; terrainMesh.material.needsUpdate=true;
+}
+function updateWaterMesh(){
+  const p=waterMesh.geometry.attributes.position, k=sc()*S.ex;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const i=y*N+x, o=((N-1-y)*N+x)*4, w=d[i];
+    if(sea[i]){ p.setZ(i,0); waterData[o]=25;waterData[o+1]=70;waterData[o+2]=130;waterData[o+3]=190; continue; }
+    if(w<0.05){ p.setZ(i,-40*k); waterData[o+3]=0; continue; }
+    p.setZ(i,(b[i]+w)*k+0.05);
+    const t=Math.min(1,w/3);
+    waterData[o]=150-140*t; waterData[o+1]=210-170*t; waterData[o+2]=255-115*t;
+    waterData[o+3]=Math.min(235,120+w*90);
+  }
+  p.needsUpdate=true; waterTex.needsUpdate=true;
+}
+function drawDereOverlay(){
+  if(!dereCanvas) return;
+  const g=dereCanvas.getContext("2d"), W=dereCanvas.width, f=W/(N-1);
+  g.clearRect(0,0,W,W);
+  if(!DERE){ dereTex.needsUpdate=true; return; }
+  g.lineCap=g.lineJoin="round";
+  if($("showWater").checked){
+    g.strokeStyle="#22e0ff"; g.lineWidth=2.5;
+    for(const w of DERE.ways){
+      g.setLineDash(w.tunnel?[6,6]:[]);
+      g.beginPath(); w.pts.forEach((p,i)=>i?g.lineTo(p.g[0]*f,p.g[1]*f):g.moveTo(p.g[0]*f,p.g[1]*f)); g.stroke();
+    }
+    g.setLineDash([]);
+  }
+  if($("showRoads").checked){
+    for(const r of DERE.roads){
+      // her segmenti o noktadaki suya göre renklendir
+      for(let i=1;i<r.pts.length;i++){
+        const a=r.pts[i-1].g, c=r.pts[i].g;
+        const mx=Math.round((a[0]+c[0])/2), my=Math.round((a[1]+c[1])/2);
+        const wet = d && mx>=0&&my>=0&&mx<N&&my<N && !sea[my*N+mx] && d[my*N+mx]>0.1;
+        g.strokeStyle= wet?"#ff4d4d":"#ffb020"; g.lineWidth= wet?5:3.5;
+        g.beginPath(); g.moveTo(a[0]*f,a[1]*f); g.lineTo(c[0]*f,c[1]*f); g.stroke();
+      }
+    }
+  }
+  dereTex.needsUpdate=true;
+}
+
+// ================= İstatistik =================
+let landWetFrac=0;
+function updStats(){
+  if(!d) return;
+  let area=0,mx=0,vol=0; const cA=S.cell*S.cell;
+  for(let i=0;i<N*N;i++){ if(sea[i])continue; const w=d[i]; if(w>0.1)area++; if(w>mx)mx=w; vol+=w*cA; }
+  landWetFrac=area/S.landN;
+  const m=S.simT/60;
+  $("sT").textContent = m<60 ? fmt(m)+" dk" : Math.floor(m/60)+" sa "+fmt(m%60)+" dk";
+  $("sR").textContent=fmt(S.rainMM,1)+" mm";
+  $("sA").textContent=fmt(area*cA/1e6,2)+" km²";
+  $("sD").textContent=fmt(mx,2)+" m";
+  $("sV").textContent= vol>1e6 ? fmt(vol/1e6,2)+" milyon m³" : fmt(vol)+" m³";
+  const full = S.sewer.store>0 ? Math.min(100,S.stored*1000/S.sewer.store*100) : 0;
+  $("sS").textContent = S.sewer.store>0 ? "%"+fmt(full) : "—";
+  $("gS").style.width=full+"%"; $("gS").style.background = full>95?"var(--warn)":full>70?"var(--amber)":"var(--accent)";
+  $("sK").textContent = S.drained>1e6 ? fmt(S.drained/1e6,2)+" milyon m³" : fmt(S.drained)+" m³";
+  const raining=S.simT<S.durH*3600;
+  $("hud").innerHTML = S.simT===0 ? `<b>${S.name}</b><br><span class="muted">Hazır · ▶ Yağmuru başlat</span>` :
+    (raining ? `🌧️ Yağıyor · <b>${S.rate} mm/sa</b>` : "☁️ Yağmur durdu · su çekiliyor/birikiyor") +
+    (full>95 && raining ? `<br><span style="color:var(--warn)">⚠️ Kanalizasyon dolu, ızgaralar suyu alamıyor</span>` : "") +
+    `<br><span class="muted">${S.name} · 1 hücre ≈ ${fmt(S.cell)} m</span>`;
+  updDereStats();
+}
+function updDereStats(){
+  if(!DERE) return;
+  const R=DERE.roads;
+  if(!R.length){ $("dereBody").innerHTML=`Bu bölgede adında "dere" geçen yol bulunamadı.<br>${DERE.ways.length} dere/kanal parçası gösteriliyor.`; return; }
+  let tot=0, wet=0, km=0;
+  const byName={};
+  for(const r of R){
+    km+=r.len;
+    const o=byName[r.name]||(byName[r.name]={name:r.name,len:0,max:0,wet:0,n:0});
+    o.len+=r.len;
+    for(const c of r.cells){ tot++; o.n++; const w=d?d[c]:0; if(w>0.1){wet++;o.wet++;} if(w>o.max)o.max=w; }
+  }
+  const names=Object.values(byName);
+  const fr=tot?wet/tot:0, lf=landWetFrac;
+  const ratio = lf>0.0005 ? fr/lf : 0;
+  const top=names.filter(o=>o.max>0.05).sort((a,b)=>b.max-a.max).slice(0,6);
+  const pct=x=>"%"+fmt(x*100,x<0.1?1:0);
+  $("dereBody").innerHTML = `
+    <div><b>${names.length}</b> farklı isim · <b>${fmt(km/1000,1)} km</b> yol · <b>${DERE.ways.length}</b> dere/kanal parçası</div>
+    <div class="compare">
+      <div class="cmp"><div class="t"><span>"Dere" adlı yollar su altında</span><b style="color:var(--warn)">${pct(fr)}</b></div><div class="g"><i style="width:${fr*100}%;background:var(--warn)"></i></div></div>
+      <div class="cmp"><div class="t"><span>Bölgenin geneli su altında</span><b>${pct(lf)}</b></div><div class="g"><i style="width:${lf*100}%;background:var(--accent)"></i></div></div>
+    </div>
+    ${ratio>1.2 ? `<div class="big">Adında "dere" geçen yollar, bölgenin geneline göre <b>${fmt(ratio,1)} kat</b> daha sık su altında kalıyor.</div>`
+      : S.simT>0 ? `<div class="muted">Fark henüz belirgin değil, yağış sürdükçe izle.</div>` : `<div class="muted">Yağmuru başlat; bu yolların bölge geneline göre ne kadar su altında kaldığı burada karşılaştırılacak.</div>`}
+    ${top.length?`<div style="margin-top:6px;font-weight:600">En çok su basan "dere" yolları</div><ol>${top.map(o=>`<li>${o.name} <span>· ${o.max<1?fmt(o.max*100)+" cm":fmt(o.max,2)+" m"} · ${pct(o.wet/o.n)} su altında</span></li>`).join("")}</ol>`:""}
+    <div class="muted" style="margin-top:6px">Eski dere yatakları çoğu zaman yola dönüşür; isim, suyun hâlâ oradan akmak istediğini ele verir.</div>`;
+}
+
+// ================= Yağmur parçacıkları =================
+const RAIN_N=4000;
+const rainGeo=new THREE.BufferGeometry();
+const rainPos=new Float32Array(RAIN_N*6);
+for(let i=0;i<RAIN_N;i++){ const x=(Math.random()-.5)*SIZE, y=Math.random()*120, z=(Math.random()-.5)*SIZE; rainPos.set([x,y,z,x,y-2,z],i*6); }
+rainGeo.setAttribute("position",new THREE.BufferAttribute(rainPos,3));
+const rainLines=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:0xaaccff,transparent:true,opacity:.35}));
+scene.add(rainLines);
+function updateRain(dt){
+  const raining=S.running && S.simT<S.durH*3600;
+  rainLines.visible=raining;
+  if(!raining) return;
+  const count=Math.min(RAIN_N,Math.floor(400+S.rate*18));
+  rainGeo.setDrawRange(0,count*2);
+  for(let i=0;i<count;i++){
+    const o=i*6; let y=rainPos[o+1]-dt*140;
+    if(y<-5) y+=125;
+    rainPos[o+1]=y; rainPos[o+4]=y-2.5;
+  }
+  rainGeo.attributes.position.needsUpdate=true;
+}
+
+// ================= Akış animasyonu =================
+// Parçacıklar simülasyonun kendi akı (flux) alanıyla taşınır: su nereye akıyorsa çizgiler oraya gider.
+const FP=3500, fx=new Float32Array(FP), fy=new Float32Array(FP), fa=new Float32Array(FP);
+const flowPos=new Float32Array(FP*6), flowCol=new Float32Array(FP*6);
+const flowGeo=new THREE.BufferGeometry();
+flowGeo.setAttribute("position",new THREE.BufferAttribute(flowPos,3));
+flowGeo.setAttribute("color",new THREE.BufferAttribute(flowCol,3));
+const flowLines=new THREE.LineSegments(flowGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));
+flowLines.renderOrder=3; flowLines.frustumCulled=false; scene.add(flowLines);
+for(let i=0;i<FP;i++){ fx[i]=-1; fa[i]=Math.random()*3; }
+function cellVel(i,x){
+  const w=d[i]; if(w<0.03||sea[i]) return null;
+  const den=2*S.cell*w;
+  const vx=(fR[i]-fL[i]+(x>0?fR[i-1]:0)-(x<N-1?fL[i+1]:0))/den;
+  const vy=(fB[i]-fT[i]+(i>=N?fB[i-N]:0)-(i<N*N-N?fT[i+N]:0))/den;
+  return [vx,vy];
+}
+function updateFlow(rdt){
+  const on=$("flowOn").checked && S.loaded && d && S.simT>0;
+  flowLines.visible=on; if(!on) return;
+  const k=sc()*S.ex, half=SIZE/2, f=SIZE/(N-1);
+  for(let p=0;p<FP;p++){
+    fa[p]-=rdt;
+    let x=Math.floor(fx[p]), y=Math.floor(fy[p]), i=y*N+x, v=null;
+    if(fx[p]>=0 && fa[p]>0 && x>=0&&y>=0&&x<N&&y<N) v=cellVel(i,x);
+    if(!v || Math.hypot(v[0],v[1])<0.02){
+      // ıslak bir hücrede yeniden doğ
+      let ok=false;
+      for(let t=0;t<12&&!ok;t++){ const xx=Math.random()*N, yy=Math.random()*N, ii=Math.floor(yy)*N+Math.floor(xx); if(!sea[ii]&&d[ii]>0.05){fx[p]=xx;fy[p]=yy;ok=true;} }
+      fa[p]=1+Math.random()*2.5;
+      if(!ok){ fx[p]=-1; flowPos.fill(0,p*6,p*6+6); continue; }
+      x=Math.floor(fx[p]); y=Math.floor(fy[p]); i=y*N+x; v=cellVel(i,x); if(!v){flowPos.fill(0,p*6,p*6+6);continue;}
+    }
+    const sp=Math.hypot(v[0],v[1]);
+    const g=Math.min(6,sp*5)*rdt; // görsel hız (hücre/sn)
+    const ox=fx[p], oy=fy[p];
+    fx[p]+=v[0]/sp*g; fy[p]+=v[1]/sp*g;
+    const tail=Math.min(2.5,0.4+sp*1.5);
+    const h=(b[i]+d[i])*k+0.12;
+    const o=p*6;
+    flowPos[o]=(ox-v[0]/sp*tail)*f-half; flowPos[o+1]=h; flowPos[o+2]=(oy-v[1]/sp*tail)*f-half;
+    flowPos[o+3]=fx[p]*f-half; flowPos[o+4]=h; flowPos[o+5]=fy[p]*f-half;
+    const a=Math.min(1,fa[p])*Math.min(1,0.35+sp*0.6);
+    flowCol[o]=0.2*a; flowCol[o+1]=0.35*a; flowCol[o+2]=0.5*a;
+    flowCol[o+3]=0.85*a; flowCol[o+4]=0.95*a; flowCol[o+5]=1*a;
+  }
+  flowGeo.attributes.position.needsUpdate=true; flowGeo.attributes.color.needsUpdate=true;
+}
+
+// ================= Fare ile sorgu =================
+renderer.domElement.addEventListener("mousemove",e=>{
+  if(!terrainMesh) return;
+  const r=renderer.domElement.getBoundingClientRect();
+  mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObject(terrainMesh)[0];
+  const tip=$("tip");
+  if(!hit){tip.style.display="none";return;}
+  const gx=hit.uv.x*(N-1), gy=(1-hit.uv.y)*(N-1), x=Math.round(gx), y=Math.round(gy), i=y*N+x;
+  let near="";
+  if(DERE){
+    let best=1.2;
+    for(const rd of DERE.roads) for(const p of rd.pts){ const dd=Math.hypot(p.g[0]-gx,p.g[1]-gy); if(dd<best){best=dd;near=rd.name;} }
+  }
+  tip.style.display="block"; tip.style.left=(e.clientX-r.left+14)+"px"; tip.style.top=(e.clientY-r.top+14)+"px";
+  tip.innerHTML = sea[i] ? "Deniz" : `${near?`🛣️ <b>${near}</b><br>`:""}Yükseklik: <b>${fmt(b[i])} m</b><br>Su: <b>${d[i]<0.01?"kuru":(d[i]<1?fmt(d[i]*100)+" cm":fmt(d[i],2)+" m")}</b>`;
+});
+renderer.domElement.addEventListener("mouseleave",()=>$("tip").style.display="none");
+
+// ================= Döngü =================
+function resize(){ const w=view.clientWidth,h=view.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+addEventListener("resize",resize); resize();
+
+let last=performance.now(), statAcc=0;
+function loop(now){
+  const rdt=Math.min(0.1,(now-last)/1000); last=now;
+  if(S.running && S.loaded){
+    const DT=0.35*Math.sqrt(S.cell/G);
+    const target=S.speed*60*rdt, t0=performance.now();
+    let done=0;
+    while(done<target && performance.now()-t0<20){ simStep(DT); done+=DT; }
+    updateWaterMesh();
+    statAcc+=rdt; if(statAcc>0.4){ statAcc=0; updStats(); drawDereOverlay(); }
+  }
+  if(fly){
+    fly.t=Math.min(1,fly.t+rdt/0.9); const e=1-Math.pow(1-fly.t,3);
+    controls.target.lerpVectors(fly.fromT,fly.toT,e); camera.position.lerpVectors(fly.fromP,fly.toP,e);
+    if(fly.t>=1) fly=null;
+  }
+  const lim=SIZE*0.6, tg=controls.target;
+  if(Math.abs(tg.x)>lim||Math.abs(tg.z)>lim){ const ox=tg.x, oz=tg.z; tg.x=Math.max(-lim,Math.min(lim,tg.x)); tg.z=Math.max(-lim,Math.min(lim,tg.z)); camera.position.x+=tg.x-ox; camera.position.z+=tg.z-oz; }
+  updateRain(rdt);
+  updateFlow(rdt);
+  controls.update();
+  updateLabels();
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+setTimeout(()=>pmap.invalidateSize(),100);
+function camDist(){ return camera.position.distanceTo(controls.target); }
+function setView(polar,az,dist,target){
+  const t=target||controls.target.clone();
+  const p=new THREE.Vector3().setFromSphericalCoords(dist,polar,az).add(t);
+  fly={t:0,fromT:controls.target.clone(),toT:t,fromP:camera.position.clone(),toP:p};
+}
+$("nNorth").onclick=()=>setView(controls.getPolarAngle(),0,camDist());
+$("nIn").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.max(6,camDist()*0.6));
+$("nOut").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.min(500,camDist()*1.6));
+$("nTop").onclick=()=>setView(0.01,controls.getAzimuthalAngle(),camDist());
+$("nHome").onclick=()=>setView(Math.atan2(180,140),0,Math.hypot(140,180),new THREE.Vector3());
+</script>
 </body>
 </html>
