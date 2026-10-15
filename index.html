@@ -375,23 +375,28 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <label>Yağış süresi <span id="durV"></span></label>
     <input type="range" id="dur" min="0.5" max="12" step="0.5" value="3">
   </div>
+  <h2>Zemin</h2>
   <div class="ctrl">
-    <label>Zemin (suyu emme)</label>
-    <select id="soil">
-      <option value="2" selected>Beton / asfalt (yoğun kentsel) · 6 → 1 mm/sa</option>
+    <label>Zemin bilgisi</label>
+    <div class="seg" id="soilSrc">
+      <button data-v="map" class="on">Haritadan<small>uydu + toprak, hücre hücre</small></button>
+      <button data-v="one">Tek tip<small>her yer aynı</small></button>
+    </div>
+    <select id="soilOne" style="margin-top:6px" hidden>
+      <option value="2">Beton / asfalt (yoğun kentsel) · 6 → 1 mm/sa</option>
       <option value="8">Karışık kentsel · 30 → 3 mm/sa</option>
       <option value="25">Toprak / orman · 75 → 10 mm/sa</option>
-      <option value="80">Karstik kireçtaşı · 150 → 60 mm/sa</option>
-      <option value="0">Hiç emmesin (en kötü durum)</option>
-      <option value="map">Haritadan (arazi örtüsü + toprak) · hücre hücre</option>
+      <option value="80">Kireçtaşı (karst) · 150 → 60 mm/sa</option>
     </select>
-    <label style="margin-top:8px">Önceki günler</label>
-    <select id="ante">
-      <option value="dry">Kuru · zemin suyu iyi emer</option>
-      <option value="wet">Nemli · son günlerde yağmur yağdı</option>
-      <option value="sat" selected>Doygun · uzun süredir yağıyor</option>
-    </select>
-    <p class="sub" id="soilInfo" style="margin-top:4px"></p>
+    <label style="margin-top:10px">Yağmur başlarken zemin <span id="anteBy" class="muted" style="font-weight:400"></span></label>
+    <div class="seg" id="anteSeg">
+      <button data-v="dry">Kuru</button><button data-v="wet">Nemli</button><button data-v="sat" class="on">Doygun</button>
+    </div>
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:10px"><input type="checkbox" id="soilZero"> En kötü durum: zemin hiç su emmesin</label>
+    <p class="sub" id="soilInfo" style="margin-top:6px"></p>
+    <!-- asıl seçimler (diğer betikler bunları dinler); yukarıdaki düğmeler bunları ayarlar -->
+    <select id="soil" hidden><option value="2">2</option><option value="8">8</option><option value="25">25</option><option value="80">80</option><option value="0">0</option><option value="map" selected>map</option></select>
+    <select id="ante" hidden><option value="dry">dry</option><option value="wet">wet</option><option value="sat" selected>sat</option></select>
   </div>
   <h2>Kanalizasyon / yağmur suyu sistemi</h2>
   <div class="ctrl">
@@ -409,7 +414,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   </div>
   <h2>Havza ve karst</h2>
   <div class="ctrl">
-    <label style="justify-content:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="karstOn"> 🕳️ Karst modu <span class="muted" style="font-weight:400">(kireçtaşı + düdenler)</span></label>
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="karstOn"> 🕳️ Karst modu <span class="muted" style="font-weight:400">(düdenler suyu yutar)</span></label>
     <p class="sub" id="karstInfo" style="margin-top:4px" hidden></p>
     <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:8px"><input type="checkbox" id="depSink"> 🕳️ Kapalı çukurlar yeraltına boşalsın</label>
     <p class="sub" id="depInfo" style="margin-top:4px"></p>
@@ -417,7 +422,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <p class="sub" id="upInfo" style="margin-top:4px"></p>
     <p class="sub" style="margin-top:4px;font-size:11px">Simülasyon alanının dışında kalan yukarı havzaya düşen yağmurun zemine sızmayan kısmı (zemin en az “Karışık kentsel” sayılır; kanalizasyon kaybı düşülmez, çünkü dışarıda ya şebeke yoktur ya da yağmur suyu zaten derelere boşalır), dere yataklarından gecikmeli olarak alanın kenarından girer. Kaba yükseklik verisi (~115 m hücre) ve D8 akış yönleriyle hesaplanır; hız yamaçta ~0,5, derede ~1,5 m/s varsayılır. Dışarıdaki kapalı çukurlar (baraj gölü, maden çukuru ya da kaba veride yol dolgusu olabilir) normalde dolu sayılır ve suyu geçirir; karst modunda ya da “Kapalı çukurlar yeraltına boşalsın” açıkken dolana kadar suyu tutar ve her biri en çok 5 m³/s yutar. Dere ıslahı ve kanallar hesaba katılmaz.</p>
     <p class="sub" style="margin-top:4px;font-size:11px">Kapalı çukur analizi: dolgu derinliği ≥ 2 m ve ≥ 5 hücrelik çukurlar OSM göl/baraj verisiyle karşılaştırılır; göl yoksa en alçak hücre yutak olur (5 m³/s). Topografya + OSM çıkarımıdır, jeoloji haritası değildir; DEM hataları yanlış işaret üretebilir.</p>
-    <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken zemin “Karstik kireçtaşı” (80 mm/sa) olur ve her düden en çok 5 m³/s su yutar.</p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken her düden en çok 5 m³/s su yutar.</p>
   </div>
 
   <h2>Simülasyon</h2>
@@ -590,7 +595,7 @@ const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 const SOILS = {"0":{f0:0,fc:0,k:2}, "2":{f0:6,fc:1,k:4}, "8":{f0:30,fc:3,k:2}, "25":{f0:75,fc:10,k:2}, "80":{f0:150,fc:60,k:1}};
 const ANTE = {dry:0, wet:1, sat:3};   // başlangıç ıslaklığı (x): kuru, nemli (kapasite ~%37'ye inmiş), doygun (~%5)
 const infCap = () => S.soil.fc + (S.soil.f0 - S.soil.fc)*Math.exp(-S.wetX);
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, infV:0, extIn:0, landN:1, scen:"14 Ekim 2026", rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:3, wetX:3, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, infV:0, extIn:0, landN:1, scen:"14 Ekim 2026", rate:40, durH:3, inf:30, soil:SOILS["8"], soilV:"map", ante:3, wetX:3, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -729,7 +734,7 @@ $("openPicker").onclick=openPicker;
 $("pkCancel").onclick=()=>{ pmap.stop(); $("picker").hidden=true; }; // gizli haritada uçuş animasyonu NaN üretir
 $("goBtn").onclick=()=>{
   Object.assign(S,{lat:P.lat,lon:P.lon,name:P.name,size:P.size,q:P.q});
-  if(P.karst){ setKarst(true); KARST.auto=true; } else if(KARST.auto) setKarst(false);
+  karstAuto(!!P.karst);
   pmap.stop(); $("picker").hidden=true; if(MM.on) mmHide(); loadRegion();
 };
 
@@ -743,7 +748,7 @@ SCEN.forEach(s=>{
   const c=document.createElement("button"); c.className="chip"+(s.x?" xs":""); c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
   if(s.t) c.title=s.t;
   if(s.n==="14 Ekim 2026 · en sert 3 saat") c.classList.add("on"); // varsayılan senaryo
-  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; if(s.ante) $("ante").value=s.ante; S.scen=s.h||s.n; uiUpd(); scenNote(false); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
+  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; setAnte(s.ante||"wet",true); S.scen=s.h||s.n; uiUpd(); scenNote(false); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
   (s.x?scenX:$("scen")).appendChild(c);
 });
 $("scen").append(scenXb, scenX);
@@ -762,6 +767,21 @@ function uiUpd(){
   const ex=+$("ex").value; $("exV").textContent=ex+"×";
   if (ex!==S.ex){ S.ex=ex; if (S.loaded) rebuildTerrainZ(); }
 }
+// Zemin bölümü: görünür düğmeler gizli #soil / #ante seçimlerini ayarlar (zemin haritası, kanalizasyon uyarısı vb. onları dinler)
+const fire=el=>{ el.dispatchEvent(new Event("input")); el.dispatchEvent(new Event("change")); };
+function segSet(id,v){ $(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===v)); }
+function soilSync(){
+  const src=$("soilSrc").querySelector(".on").dataset.v;
+  $("soilOne").hidden = src!=="one";
+  const v = $("soilZero").checked ? "0" : src==="map" ? "map" : $("soilOne").value;
+  if($("soil").value!==v){ $("soil").value=v; fire($("soil")); } else uiUpd();
+}
+function setSoil(src,one){ segSet("soilSrc",src); if(one) $("soilOne").value=one; soilSync(); }
+// ıslaklık: senaryo seçince kendisi ayarlanır (bySc), elle değiştirilince not kalkar
+function setAnte(v,bySc){ segSet("anteSeg",v); $("anteBy").textContent = bySc ? "· senaryo seçti" : ""; if($("ante").value!==v){ $("ante").value=v; fire($("ante")); } }
+$("soilSrc").onclick=e=>{ const b=e.target.closest("button"); if(b) setSoil(b.dataset.v); };
+$("anteSeg").onclick=e=>{ const b=e.target.closest("button"); if(b) setAnte(b.dataset.v,false); };
+$("soilOne").onchange=soilSync; $("soilZero").onchange=soilSync;
 function soilUI(){
   const p=S.soil, el=$("soilInfo"); if(!el) return;
   if(S.soilV==="map"&&window.infSoilText){ el.textContent=infSoilText(); return; }
@@ -769,6 +789,7 @@ function soilUI(){
     `Zemin şu an saatte ${fmt(S.inf,1)} mm emiyor. Kuruyken ${p.f0} mm/sa emer, ıslandıkça ${p.fc} mm/sa'e iner (Horton). Yukarı havzaya da aynısı uygulanır.`;
 }
 ["rate","dur","soil","ante","spd","ex","sewer","blk"].forEach(id=>$(id).oninput=uiUpd); uiUpd();
+setAnte("sat",true); // açılış senaryosu (14 Ekim) zemini doygun başlatır
 ["rate","dur"].forEach(id=>$(id).addEventListener("input",()=>{ S.scen="Elle ayar"; scenNote(false); }));
 $("tex").onchange=applyTexture;
 $("play").onclick=()=>{ S.running=!S.running; updPlay(); };
@@ -1389,13 +1410,16 @@ function karstPrep(){
   DEPR={list,comp,sink:null,status:list.length?"bekliyor":"yok",src:""};
   sinkRebuild(); karstUI(); depUI();
 }
+// Karst modu yalnızca düdenleri açar, zemin seçimine dokunmaz. Karst bölgesi listeden seçilince (KARST.auto) zemin ayrıca
+// "Tek tip · Kireçtaşı" yapılır (zemin haritası kireçtaşını tınlı toprak sayabiliyor), bölgeden çıkınca önceki seçime döner.
+function karstAuto(on){
+  if(on){ if(!KARST.auto){ KARST.soilPrev={src:$("soilSrc").querySelector(".on").dataset.v, one:$("soilOne").value}; }
+    setKarst(true); KARST.auto=true; setSoil("one",String(KARST_INF)); }
+  else if(KARST.auto){ setKarst(false); const p=KARST.soilPrev; KARST.soilPrev=null; if(p) setSoil(p.src,p.one); }
+}
 function setKarst(on){
   KARST.auto=false;
-  if(on!==KARST.on){
-    if(on){ KARST.soilPrev=$("soil").value; if(KARST.soilPrev!=="map") $("soil").value=String(KARST_INF); } // haritadan zemin seçiliyse korunur
-    else if(KARST.soilPrev!=null && $("soil").value===String(KARST_INF)) $("soil").value=KARST.soilPrev;
-    KARST.on=on;
-  }
+  KARST.on=on;
   $("karstOn").checked=on; $("depSink").checked=on; sinkRebuild(); uiUpd(); karstUI(); depUI(); drawDereOverlay(); updStats();
 }
 function karstUI(){
@@ -2660,7 +2684,7 @@ function mmCommit(){
   const c=MM.map.getCenter().wrap();
   const name=MM.pick && hav({lat:c.lat,lon:c.lng},MM.pick)<3000 ? MM.pick.n : mmNearest(c.lat,c.lng);
   Object.assign(S,{lat:c.lat,lon:c.lng,name}); // boyut ve kalite ayarları korunur
-  if(KARST.auto) setKarst(false);
+  karstAuto(false);
   fly=null; controls.target.set(0,0,0); camera.position.set(0,140,180); // varsayılan eğik görünüm
   mmHide();
   MM.busy=true; ov(`${name} yükleniyor…`,0);

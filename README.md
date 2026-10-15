@@ -14,7 +14,7 @@ Kurulum gerekmez; tek bir HTML sayfası ve yardımcı betiklerden oluşur, telef
 
 - **Bölge seçimi:** Haritadan herhangi bir yer ya da hazır İstanbul dereleri (Kağıthane, Ayamama, Kurbağalıdere, Alibeyköy, Haliç, Haramidere, Sarıyer, Riva); il/ilçe araması, karst alanları ve dağlar. Kamerayı kaydırınca simülasyon alanı da taşınır, su korunur.
 - **Yağış senaryoları:** gerçek ölçümlere dayalı hazır senaryolar, saat saat değişen gerçek yağış, önümüzdeki 3 günün tahmini (hata payıyla) ve gizli bir "aşırı senaryolar" bölümü.
-- **Kanalizasyon ve zemin:** şebeke kapasitesi, ızgara tıkanıklığı, zeminin suyu emme hızı (zemin ıslandıkça azalır) ve önceki günlerin yağışı (kuru / nemli / doygun); karst modu (düdenler) ve kapalı çukurların yeraltına boşalması.
+- **Kanalizasyon ve zemin:** şebeke kapasitesi, ızgara tıkanıklığı, zemin (haritadan hücre hücre ya da tek tip; ıslandıkça daha az emer), yağmur başlarken zeminin ıslaklığı (kuru / nemli / doygun) ve "en kötü durum: hiç emmesin"; karst modu (düdenler) ve kapalı çukurların yeraltına boşalması.
 - **Dereler:** OpenStreetMap dereleri araziye işlenir (köprü ve viyadükler akışı kesmez). "Dere" adlı yollarda akış istatistiği ve olası eski dere yatakları gösterilir.
 - **Havzadan gelen su:** simülasyon alanının dışındaki yukarı havzaya düşen yağış, dere yataklarından gecikmeli olarak alana girer.
 - **Drenaj alanı aracı:** bir noktaya sağ tıklayınca o noktanın drenaj alanı, toplanma süresi ve farklı yağışlarda gelebilecek debi (Rasyonel Yöntem).
@@ -52,7 +52,7 @@ Her şey tarayıcıda, JavaScript ve Three.js ile hesaplanır; sunucu tarafı yo
 
 ## Zemin emişi haritası
 
-Ayarlarda **Zemin → "Haritadan (arazi örtüsü + toprak)"** seçilince her hücre kendi Horton eğrisini kullanır: f = fc + (f0 − fc)·e^(−x). Islaklık x "Önceki günler" ile başlar ve sonra her hücrede ayrı ilerler (aşağıya bakın). Sol paneldeki **🌱 Zemin emişi haritası** düğmesi (ya da Görünüm menüsü, Dere izleri paneli) emişi renklendirir: "Şu an" simülasyondaki ıslaklıkla, "Kuruyken" arazi örtüsü ve toprak farkını en iyi gösterir; fare ipucu hücrenin arazi örtüsünü, toprağını ve şu anki emişini yazar. Varsayılan seçim değişmedi (Beton / asfalt + Doygun).
+Ayarlarda **Zemin → Zemin bilgisi: Haritadan** (varsayılan) seçiliyken her hücre kendi Horton eğrisini kullanır: f = fc + (f0 − fc)·e^(−x). Islaklık x "Yağmur başlarken zemin" (kuru / nemli / doygun; senaryo seçince kendisi ayarlanır) ile başlar ve sonra her hücrede ayrı ilerler (aşağıya bakın). Sol paneldeki **🌱 Zemin emişi haritası** düğmesi (ya da Görünüm menüsü, Dere izleri paneli) emişi renklendirir: "Şu an" simülasyondaki ıslaklıkla, "Kuruyken" arazi örtüsü ve toprak farkını en iyi gösterir; fare ipucu hücrenin arazi örtüsünü, toprağını ve şu anki emişini yazar. "Tek tip" seçilirse bütün alan tek bir zemin (beton, karışık kentsel, toprak/orman, kireçtaşı) sayılır.
 
 Her hücre için üç bilgi birleştirilir:
 
@@ -71,7 +71,7 @@ Parametreler (mm/sa):
 - **Hücre bazında ıslaklık:** her hücrenin ıslaklığı, o hücreye gelen suyla ilerler. Gelen su yağmur ve üstten akan sudur (run-on). Su emişi karşılıyorsa ıslaklık tam hızla artar, az geliyorsa oranıyla artar. Böylece yamaçtan su alan vadi tabanı, yalnız yağmur alan tepeden önce doyar. Betondan akıp ormana giren su orada emilir.
 - **Yukarı havza:** pencereye akan dış hücreler aynı karolardan örneklenir; her parametre sınıfının yağış fazlası alanıyla ağırlıklandırılır. Bu seçenekte "dışarısı en az Karışık kentsel" kuralı uygulanmaz.
 
-**Hesaba katılmayanlar:** toprak derinliği, sıkışma, kök ve solucan kanalları (makro gözenekler), eğim, donmuş zemin ve kentte asfalt altındaki gerçek toprak. WorldCover'da "yapı" sınıfı küçük bahçeleri de içine alabilir. SoilGrids bir tahmin modelidir; kentte toprak tahmini özellikle belirsizdir. GLiM ızgarası tek tek kayalıkları ayırt etmez; karst için asıl araç yine **Karst modu**dur. Karst modu açıldığında bu seçenek korunur.
+**Hesaba katılmayanlar:** toprak derinliği, sıkışma, kök ve solucan kanalları (makro gözenekler), eğim, donmuş zemin ve kentte asfalt altındaki gerçek toprak. WorldCover'da "yapı" sınıfı küçük bahçeleri de içine alabilir. SoilGrids bir tahmin modelidir; kentte toprak tahmini özellikle belirsizdir. GLiM ızgarası tek tek kayalıkları ayırt etmez; karst için asıl araç yine **Karst modu**dur. Karst modu zemine dokunmaz, yalnızca düdenleri açar; listeden bir karst bölgesi seçilince zemin kendiliğinden "Tek tip · Kireçtaşı" olur.
 
 **İlk deneme** ([rapor](docs/zemin-emisi-deneme.md)):
 - Kağıthane'de 40 mm/sa · 3 sa yağışta harita "Beton / asfalt"a yakın sonuç veriyor; su basan alan seçimden seçime %1–2'den fazla değişmiyor.

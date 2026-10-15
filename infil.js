@@ -166,7 +166,7 @@
     const p=params(r,g,bv), T=TEX[bv&15], lc=r===5||g>=125?"yapı / yol":(LC[r]||{n:"?"}).n.toLowerCase();
     return `<br>Zemin: <b>${lc}</b> · ${nt}<br><span class="muted">${g&&r!==5?`yapı %${fmt(g/2.5)} · `:""}toprak ${T?T[0]:"bilinmiyor"}${bv&32?" (çevreden tahmin)":""}${bv&16?" · karbonatlı kayaç bölgesi":""}`+
       ` · kuru ${fmt(p.f0)}, doygun ${fmt(p.fc,1)} mm/sa · ıslaklık %${fmt(100*(1-Math.exp(-xAt(i))))}</span>`+
-      (S.soilV!=="map"?`<br><span class="muted">Simülasyon şu an tek zemin kullanıyor; haritayı kullanmak için Zemin → Haritadan.</span>`:"");
+      (S.soilV!=="map"?`<br><span class="muted">Simülasyon şu an tek zemin kullanıyor; haritayı kullanmak için Zemin bilgisi → Haritadan.</span>`:"");
   };
 
   // harita katmanı: anlık kapasite, log ölçek 1–100 mm/sa; uydu görüntüsünün üstüne yarı saydam
@@ -194,6 +194,7 @@
   setInterval(()=>{ if(S.loaded&&$("tex").value==="inf") refresh(false); },1500);
   const onSel=()=>{ if(need()&&S.loaded&&(!M.ok||M.reg!==REG)) prep(); if(M.ok&&!M.up&&M.upGeo) upPrep2(); ui(); };
   $("soil").addEventListener("change",onSel); $("tex").addEventListener("change",onSel);
+  { const kick=setInterval(()=>{ if(typeof S==="undefined"||!S.loaded) return; clearInterval(kick); onSel(); },500); } // açılışta varsayılan "Haritadan"
   // ön yüzde kısa yol: sol panelde bölge kartının altında düğme ve Dere izleri panelinde katman kutusu (Görünüm seçimiyle eşli)
   let texPrev="sat";
   const setLayer=on=>{ const t=$("tex"), cur=t.value;

@@ -183,9 +183,9 @@ if(document.readyState === "loading"){
   });
   const restart = () => { resetWater(); S.running = S.loaded; updPlay(); };
   chipP.onclick = () => { use("past"); restart(); };
-  chipF.onclick = () => { use("fc"); restart(); };
+  chipF.onclick = () => { setAnte("wet",true); use("fc"); restart(); };
   // en yağışlı 12 saatten önce de (sabah, 13 Ekim) yağmur yağıyordu: zemin doygun başlar
-  chipD.onclick = () => { $("ante").value = "sat"; uiUpd(); use("day"); restart(); };
+  chipD.onclick = () => { setAnte("sat",true); use("day"); restart(); };
   // başka bir senaryo ya da elle ayar → gerçek veri kapanır
   scen.addEventListener("click", e => { const c=e.target.closest(".chip"); if(c && c!==chipP && c!==chipF && c!==chipD && !c.classList.contains("scenXb")) off(); });
   ["rate","dur"].forEach(id => $(id).addEventListener("input", off));

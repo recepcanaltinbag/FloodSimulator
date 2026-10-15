@@ -254,7 +254,12 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px;paddin
 <tr><td>Karstik kireçtaşı</td><td class="n">150 mm/sa</td><td class="n">60 mm/sa</td></tr>
 </table></div>
 <p>Bu değerler literatürdeki tipik aralıklardan seçilmiş kaba değerler; İstanbul için ölçülmüş değil. Şehirde değerler düşük, çünkü yüzeyin büyük kısmı beton ve asfalt.</p>
-<p><b>Önceki günler</b> seçeneği zeminin başlangıçtaki ıslaklığını belirler: kuru, nemli ya da doygun. 14 Ekim'de sabahtan beri yağdığı için o senaryo doygun zeminle başlar.</p>
+<p>Ayarlardaki <b>Zemin</b> bölümünde üç şey var:</p>
+<ul>
+<li><b>Zemin bilgisi:</b> "Haritadan" (varsayılan) her hücreye kendi zeminini verir. "Tek tip" seçersen bütün alan yukarıdaki dört türden biri sayılır.</li>
+<li><b>Yağmur başlarken zemin:</b> kuru, nemli ya da doygun. Senaryo seçince kendisi ayarlanır; 14 Ekim'de sabahtan beri yağdığı için o senaryo doygun başlar. İstersen değiştirebilirsin.</li>
+<li><b>En kötü durum:</b> işaretlersen zemin hiç su emmez, yağmurun tamamı akışa geçer.</li>
+</ul>
 <h3>Haritadan gelen emiş</h3>
 <p>Yukarıdaki dört seçenekte bütün alan aynı zemin sayılır. <b>Haritadan (arazi örtüsü + toprak)</b> seçeneğinde ise her hücre kendi zeminini alır. Bunun için üç açık veri birleştirilir:</p>
 <ul>
@@ -318,7 +323,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px;paddin
 <section id="cukur">
 <h2>Kapalı çukurlar ve karst</h2>
 <p>Bazı yerler her taraftan yüksek arazilerle çevrilidir; su oraya girer ama çıkamaz. Bunlara <b>kapalı çukur</b> diyoruz. Göl ya da baraj olabilir, bir yol dolgusunun arkası olabilir, ya da gerçekten su birikecek bir yer olabilir. Simülasyon en az 2 m derinliğindeki çukurları bulur ve OpenStreetMap'teki göl ve yol verisiyle karşılaştırır.</p>
-<p><b>Karst</b>, kireçtaşının suyla eriyerek oluşturduğu arazidir. Bu bölgelerde su yüzeyde akmak yerine çatlaklardan ve <b>düden</b> denen deliklerden yeraltına iner. Karst modunda zemin çok daha hızlı emer, çukurların en alçak noktaları da düden gibi suyu yutar.</p>
+<p><b>Karst</b>, kireçtaşının suyla eriyerek oluşturduğu arazidir. Bu bölgelerde su yüzeyde akmak yerine çatlaklardan ve <b>düden</b> denen deliklerden yeraltına iner. Karst modu açılınca çukurların en alçak noktaları düden gibi suyu yutar. Listeden bir karst bölgesi seçersen zemin de kendiliğinden "Kireçtaşı" olur ve çok daha hızlı emer.</p>
 </section>
 
 <section id="arazi">
