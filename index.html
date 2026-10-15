@@ -810,7 +810,54 @@ function fabIndex(){
     .then(j=>{ FAB.set=new Set(j.tiles); return FAB.set; }));
 }
 const fabHas=(z,x,y)=>!!FAB.set && z>=12 && FAB.set.has((x>>(z-12))+"/"+(y>>(z-12)));
+// PNG'yi canvas'a çizmeden, doğrudan baytlarından çöz. Bazı tarayıcılar (iOS Safari gizli sekme / gelişmiş parmak izi
+// koruması, Brave, Firefox resistFingerprinting) getImageData'ya rastgele gürültü ekler; terrarium'da R kanalındaki ±1
+// hata ±256 m demek → arazi diken diken çıkar, her yer kapalı çukur sayılır. Yalnızca 8 bit RGB/RGBA, taramasız PNG.
+async function inflateZ(u8){
+  const ds=new DecompressionStream("deflate"), w=ds.writable.getWriter(); w.write(u8); w.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+async function pngHeights(buf){
+  const u=new Uint8Array(buf), dv=new DataView(buf);
+  if(u[0]!==0x89||u[1]!==0x50) return null;
+  let o=8, W=0, Hh=0, ct=0, idat=[], n=0;
+  while(o+8<=u.length){
+    const len=dv.getUint32(o), type=String.fromCharCode(u[o+4],u[o+5],u[o+6],u[o+7]), d=o+8;
+    if(type==="IHDR"){ W=dv.getUint32(d); Hh=dv.getUint32(d+4); ct=u[d+9];
+      if(u[d+8]!==8||u[d+12]!==0||(ct!==2&&ct!==6)) return null; }
+    else if(type==="IDAT"){ idat.push(u.subarray(d,d+len)); n+=len; }
+    else if(type==="IEND") break;
+    o=d+len+4;
+  }
+  if(W!==256||Hh!==256||!n) return null;
+  const z=new Uint8Array(n); let k=0; for(const c of idat){ z.set(c,k); k+=c.length; }
+  const raw=await inflateZ(z), bpp=ct===6?4:3, stride=W*bpp, px=new Uint8Array(stride*Hh);
+  if(raw.length<(stride+1)*Hh) return null;
+  for(let y=0;y<Hh;y++){
+    const f=raw[y*(stride+1)], src=y*(stride+1)+1, row=y*stride, up=row-stride;
+    for(let x=0;x<stride;x++){
+      const r=raw[src+x], a=x>=bpp?px[row+x-bpp]:0, bb=y?px[up+x]:0, c=(x>=bpp&&y)?px[up+x-bpp]:0;
+      let v;
+      if(f===0) v=r; else if(f===1) v=r+a; else if(f===2) v=r+bb; else if(f===3) v=r+((a+bb)>>1);
+      else { const pp=a+bb-c, pa=Math.abs(pp-a), pb=Math.abs(pp-bb), pc=Math.abs(pp-c); v=r+(pa<=pb&&pa<=pc?a:pb<=pc?bb:c); }
+      px[row+x]=v&255;
+    }
+  }
+  const h=new Float32Array(65536);
+  for(let i=0,j=0;i<65536;i++,j+=bpp) h[i]=px[j]*256+px[j+1]+px[j+2]/256-32768;
+  return h;
+}
 function decodeTile(url,hi){
+  if(typeof DecompressionStream!=="undefined") return (async()=>{
+    await netSlot(hi);
+    let buf; try{ const r=await fetch(url,{mode:"cors"}); if(!r.ok) throw new Error(url); buf=await r.arrayBuffer(); } finally{ netDone(); }
+    let h=null; try{ h=await pngHeights(buf); }catch(e){}
+    if(h) return h;
+    return decodeCanvas(url,hi);   // beklenmeyen PNG biçimi: eski yol
+  })();
+  return decodeCanvas(url,hi);
+}
+function decodeCanvas(url,hi){
   return loadBitmap(url,hi).then(bm=>{
     if(!decCv) decCv=typeof OffscreenCanvas!=="undefined" ? new OffscreenCanvas(256,256) : Object.assign(document.createElement("canvas"),{width:256,height:256});
     const g=decCv.getContext("2d",{willReadFrequently:true}); g.clearRect(0,0,256,256); g.drawImage(bm,0,0);
