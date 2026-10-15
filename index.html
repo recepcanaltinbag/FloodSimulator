@@ -103,22 +103,50 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .lb.c-suburb::after,.lb.c-road::after{display:none}
 .lb.c-road{font-style:italic;color:#ffe9a8;font-weight:500}
 .note{font-size:11px;color:var(--muted);margin-top:14px}
-/* ===== Telefon / dar ekran: üst çubuk → 3B görünüm → istatistikler → ayarlar ===== */
+/* ===== Telefon / dar ekran: tek tam ekran — ince üst çubuk + 3B görünüm + alt istatistik şeridi; ayarlar sağdan çekmece ===== */
+.drawer-h,.set-tab,.drawer-bg{display:none}
 @media (max-width:900px){
-  .wrap{display:flex;flex-direction:column;height:auto}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  .wrap{display:flex;flex-direction:column;height:100vh;height:100dvh}
   aside{display:contents}
-  aside .top{order:0;background:var(--panel);padding:10px 16px 8px;border-bottom:1px solid var(--line)}
-  aside .top h1{font-size:16px}
-  aside .top .sub{display:none}
-  aside .top #liveSt{margin-bottom:6px!important}
-  aside .top .region{margin-top:4px;padding:6px 10px}
-  .main{order:1}
-  aside .settings{order:2;background:var(--panel);padding:4px 16px 20px}
-  #view{flex:none;height:65vh;min-height:300px}
-  .main .panel{position:static;order:1;width:auto;max-width:none;max-height:none;margin:8px 12px 0;border-radius:12px;backdrop-filter:none}
-  .main .stats{order:2}
-  .hud{max-width:calc(100% - 24px)}
-  .legend{transform:scale(.85);transform-origin:left bottom}
+  aside .top{order:0;flex:none;display:flex;align-items:center;gap:6px;background:var(--panel);padding:6px 10px;padding-top:max(6px,env(safe-area-inset-top));border-bottom:1px solid var(--line)}
+  aside .top h1{font-size:14.5px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  aside .top .sub,aside .top #liveSt,aside .top .region .ic,aside .top .region>div{display:none}
+  aside .top .live{margin:0;gap:6px}
+  aside .top .ib{width:32px;height:32px;flex-basis:32px}
+  aside .top .region{margin:0;padding:0;background:none;border:0}
+  .main{order:1;flex:1;min-height:0}
+  #view{flex:1;height:auto;min-height:0}
+  .stats{flex:none;display:flex;grid-template-columns:none;gap:14px;overflow-x:auto;overflow-y:hidden;padding:6px 12px;padding-bottom:max(6px,env(safe-area-inset-bottom));scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .stats::-webkit-scrollbar{display:none}
+  .stat{flex:none;min-width:84px}
+  .stat .k{font-size:10px;white-space:nowrap}
+  .stat .v{font-size:14px;white-space:nowrap}
+  .main .panel{top:8px;right:8px;width:min(300px,calc(100% - 16px));max-height:60%}
+  .main .panel.collapsed{width:auto}
+  .hud{left:8px;top:8px;padding:6px 10px;font-size:12px;max-width:calc(100% - 160px)}
+  .hud b{font-size:13px}
+  .legend{left:8px;bottom:8px;transform:scale(.85);transform-origin:left bottom}
+  .legend .row{display:none}
+  .nav{right:8px;bottom:8px}
+  .shift{top:auto;bottom:64px}
+  /* ayarlar çekmecesi */
+  aside .settings{position:fixed;top:0;right:0;bottom:0;width:85%;max-width:420px;z-index:40;background:var(--panel);border-left:1px solid var(--line);
+    padding:0 16px 24px;padding-bottom:max(24px,env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    transform:translateX(105%);transition:transform .25s ease;box-shadow:-12px 0 40px rgba(0,0,0,.5)}
+  body.drawer-open aside .settings{transform:none}
+  .drawer-h{display:flex;position:sticky;top:0;z-index:1;align-items:center;justify-content:space-between;background:var(--panel);margin:0 -16px;padding:12px 16px 8px;border-bottom:1px solid var(--line);font-weight:700;font-size:15px}
+  .drawer-bg{display:block;position:fixed;inset:0;z-index:39;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s}
+  body.drawer-open .drawer-bg{opacity:1;pointer-events:auto}
+  .set-tab{display:block;position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:3;border:1px solid var(--line);border-right:0;border-radius:12px 0 0 12px;
+    background:rgba(11,15,21,.85);color:var(--ink);padding:10px 8px 10px 10px;font-weight:600;font-size:13px;cursor:pointer;backdrop-filter:blur(6px)}
+}
+@media (max-width:900px) and (max-height:500px){
+  .nav{flex-direction:row}
+  .nav button{width:36px;height:36px;font-size:15px}
+  .shift{bottom:52px}
+  .legend{transform:scale(.75)}
+}
 }
 
 /* ===== Bölge seçim ekranı ===== */
@@ -194,6 +222,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   </div>
 </div>
 
+<div class="drawer-bg" id="drawerBg"></div>
 <div class="wrap">
 <aside>
 <div class="top">
@@ -212,7 +241,8 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <button class="btn ghost sm" id="openPicker">Değiştir</button>
   </div>
 </div>
-<div class="settings">
+<div class="settings" id="settings" role="dialog" aria-label="Ayarlar">
+  <div class="drawer-h"><span>⚙️ Ayarlar</span><button class="ib" id="drawerClose" title="Kapat" aria-label="Kapat">✕</button></div>
 
   <h2>Yağış senaryosu</h2>
   <div class="chips" id="scen" style="margin-bottom:10px"></div>
@@ -294,6 +324,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <div class="row"><span class="sw" style="background:var(--warn)"></span>"Dere" adlı yol (su altında)</div>
       <div class="row"><span class="sw" style="background:var(--cyan)"></span>Dere / kanal</div>
     </div>
+    <button class="set-tab" id="setTab" aria-controls="settings">⚙️ Ayarlar</button>
     <div id="labels"></div>
     <div id="tip"></div>
     <div class="nav">
@@ -489,6 +520,16 @@ function setDerePanel(open){
 }
 { let open=false; try{ open=!MOBILE && localStorage.getItem("derePanelOpen")==="1"; }catch(e){} setDerePanel(open); }
 $("dereToggle").onclick=()=>setDerePanel($("derePanel").classList.contains("collapsed"));
+// telefonda ayarlar çekmecesi: sekme ile açılır; ✕, karartma ya da sağa kaydırma ile kapanır
+function setDrawer(open){ document.body.classList.toggle("drawer-open",open); }
+$("setTab").onclick=()=>setDrawer(true);
+$("drawerClose").onclick=$("drawerBg").onclick=()=>setDrawer(false);
+{ let sx=0, sy=0, on=false; const el=$("settings");
+  el.addEventListener("touchstart",e=>{ sx=e.touches[0].clientX; sy=e.touches[0].clientY; on=true; },{passive:true});
+  el.addEventListener("touchmove",e=>{ if(!on) return; const dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
+    if(dx>60 && Math.abs(dy)<dx*0.6){ on=false; setDrawer(false); } },{passive:true});
+  el.addEventListener("touchend",()=>on=false,{passive:true}); }
+addEventListener("keydown",e=>{ if(e.key==="Escape") setDrawer(false); });
 function updPlay(){ $("play").textContent=S.running?"⏸":"▶"; $("play").title=S.running?"Duraklat":"Devam et"; if(d) updStats(); }
 
 // ================= Veri yükleme =================
@@ -1512,5 +1553,6 @@ $("nHome").onclick=()=>setView(Math.atan2(180,140),0,Math.hypot(140,180),new THR
 // İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, Abartılı görsel) yüklenir ve yağmur kendiliğinden başlar
 loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 </script>
+<script src="realrain.js"></script>
 </body>
 </html>
