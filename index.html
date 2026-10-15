@@ -2355,6 +2355,14 @@ function cellVel(i,x){
   if(w<0.004 && vx*vx+vy*vy<0.0225) return null; // çok ince ve yavaş (<0,15 m/sn) su tabakası çizilmez
   return [vx,vy];
 }
+// fare ipucu: derinlik + akış; 1 cm'nin altında akış varsa "ince su akıyor", yağmur sürüyorsa "ıslak zemin", yoksa "kuru"
+function waterTxt(i,x){
+  const w=d[i], v=cellVel(i,x), sp=v?Math.hypot(v[0],v[1]):0, flow=sp>=0.05;
+  const vt=flow?` · akıyor ${fmt(sp,sp<1?2:1)} m/sn`:"";
+  if(w>=0.01) return (w<1?fmt(w*100)+" cm":fmt(w,2)+" m")+vt;
+  if(flow) return "ince su akıyor"+` (${fmt(sp,2)} m/sn)`;
+  return (S.rate>0 && S.simT<S.durH*3600) ? "ıslak zemin" : "kuru";
+}
 function updateFlow(rdt){
   const on=$("flowOn").checked && S.loaded && d && S.simT>0;
   flowLines.visible=on; if(!on) return;
@@ -2429,7 +2437,7 @@ function showTip(){
     for(const rd of DERE.roads) for(const p of rd.pts){ const dd=Math.hypot(p.g[0]-gx,p.g[1]-gy); if(dd<best){best=dd;near=rd.name;} }
   }
   tip.classList.add("on"); tip.style.left=(e.clientX-r.left+14)+"px"; tip.style.top=(e.clientY-r.top+14)+"px";
-  tip.innerHTML = sea[i] ? "Deniz" : `${near?`🛣️ <b>${near}</b><br>`:""}Yükseklik: <b>${fmt(b[i])} m</b><br>Su: <b>${d[i]<0.01?"kuru":(d[i]<1?fmt(d[i]*100)+" cm":fmt(d[i],2)+" m")}</b>`;
+  tip.innerHTML = sea[i] ? "Deniz" : `${near?`🛣️ <b>${near}</b><br>`:""}Yükseklik: <b>${fmt(b[i])} m</b><br>Su: <b>${waterTxt(i,x)}</b>`;
 }
 
 // ================= Döngü =================

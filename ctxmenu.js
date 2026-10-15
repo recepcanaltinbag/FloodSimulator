@@ -32,7 +32,8 @@
     const h = hit.point.y / (sc()*S.ex);
     const x = Math.round(gx), y = Math.round(gy), inside = x>=0 && y>=0 && x<N && y<N, i = y*N + x;
     const w = inside && d && !sea[i] ? d[i] : null;
-    return {lat: ll.lat, lon: ll.lon, h, w, gx, gy};
+    const wt = w != null && typeof waterTxt === "function" ? waterTxt(i, x) : null;
+    return {lat: ll.lat, lon: ll.lon, h, w, wt, gx, gy};
   }
 
   const f5 = v => v.toFixed(5);
@@ -45,7 +46,7 @@
   function open(clientX, clientY){
     const p = pick(clientX, clientY); if(!p){ menu.hidden = true; return; }
     const ll = `${f5(p.lat)}, ${f5(p.lon)}`;
-    const wtxt = p.w == null ? "" : p.w < 0.01 ? " · kuru" : ` · su ${p.w < 1 ? fmt(p.w*100) + " cm" : fmt(p.w,2) + " m"}`;
+    const wtxt = p.w == null ? "" : p.wt ? ` · su: ${p.wt}` : p.w < 0.01 ? " · kuru" : ` · su ${p.w < 1 ? fmt(p.w*100) + " cm" : fmt(p.w,2) + " m"}`;
     menu.innerHTML = `<div class="hd">${ll} · ${fmt(p.h)} m${wtxt}</div>
       <button data-a="ll">📋 Koordinatı kopyala</button>
       <button data-a="full">📋 Koordinat + yükseklik${p.w!=null?" + su":""}</button>
