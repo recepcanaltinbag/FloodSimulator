@@ -217,7 +217,10 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .demst{display:block}.demst.warn{color:var(--amber)}
 .pk-sel{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
 .pk-sel b{font-size:15px}
-.pk-go{padding:13px;font-size:15px;border-radius:12px}
+.pk-go{padding:13px;font-size:15px;border-radius:12px;flex:1}
+.pk-act{position:sticky;top:-18px;z-index:3;display:flex;flex-direction:column;gap:8px;margin:-4px -18px 0;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 8px 12px -10px rgba(0,0,0,.6)}
+.pk-btns{display:flex;gap:8px;align-items:center}
+@media (max-width:900px){.pk-act{top:0}.pk-side{overflow:visible}} /* telefonda kaydıran .pk; yapışma ona göre */
 .pk-close{position:absolute;top:12px;right:12px}
 .pk-tabs{margin-bottom:10px}
 .pk-tab[hidden]{display:none}
@@ -281,6 +284,11 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
         <h3>🌧️ Nerede yağsın?</h3>
         <p class="sub">Haritadan bir bölge seç; gerçek yükseklik verisi ve uydu görüntüsüyle 3B olarak açılacak.</p>
       </div>
+      <!-- seçim ve yükle düğmesi üstte, kaydırınca da yapışık kalır (aşağıda kalınca görülmüyordu) -->
+      <div class="pk-act">
+        <div class="pk-sel" id="pkSel"></div>
+        <div class="pk-btns"><button class="btn pk-go" id="goBtn">Bu bölgeyi yükle →</button><button class="btn ghost sm" id="pkCancel" hidden>Vazgeç</button></div>
+      </div>
       <div>
         <div class="seg pk-tabs" id="pkTabs">
           <button data-t="cards" class="on">Öne çıkanlar<small>taşkın riskli</small></button>
@@ -318,9 +326,6 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
         <div class="seg" id="segQ"></div>
       </div>
       <div class="udem" id="udemPk"></div>
-      <div class="pk-sel" id="pkSel"></div>
-      <button class="btn pk-go" id="goBtn">Bu bölgeyi yükle →</button>
-      <button class="btn ghost sm" id="pkCancel" hidden>Vazgeç</button>
     </div>
   </div>
 </div>
