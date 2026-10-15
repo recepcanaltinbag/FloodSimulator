@@ -39,11 +39,21 @@ if(document.readyState === "loading"){
   const FC_HOURS = 12;             // tahmin: en yağışlı 12 saat
   const fb = () => { const c=calibrate(FALLBACK.date,FALLBACK.lat,FALLBACK.lon,FALLBACK.mm,FALLBACK.event);
     return {date:FALLBACK.date, start:START, mm:c.mm, calib:c.calib, place:FALLBACK.place, live:false}; };
-  // 14 Ekim 2026 tüm gün: bölgenin modeldeki en yağışlı 24 saati (saat saat), toplamı yakındaki AKOM ölçümlerine ölçeklenir.
+  // 14 Ekim 2026: bölgenin modeldeki en yağışlı 24 saati yakındaki AKOM ölçümlerine (24 saatlik toplam) ölçeklenir,
+  // içinden en yağışlı ardışık 12 saat saat saat uygulanır.
   // Yedek: Kağıthane, 14 Ekim 08:00 → 15 Ekim 08:00, Open-Meteo saatlik toplamlar (mm)
   const DAY_FB = {date:"2026-10-14", start:8, mm:[1.2,1.3,0.8,0.5,0.8,1.1,2.1,2.8,5.6,7.2,13.7,23.1,12.6,5.4,3.6,2.1,2.6,4.8,4.2,3.3,1.6,2.8,1.9,1.0], event:106.1};
+  // yağmur 24 saat boyunca durmadan yağmadı: ölçeklenmiş 24 saatin içinden en yağışlı ardışık 12 saat alınır
+  const DAY_H = 12;
+  function wettest(mm, start, date){
+    let best=-1, bi=0;
+    for(let i=0;i+DAY_H<=mm.length;i++){ let s=0; for(let k=0;k<DAY_H;k++) s+=mm[i+k]; if(s>best){best=s;bi=i;} }
+    const h = start + bi;
+    const d = h>=24 ? new Date(Date.parse(date+"T12:00:00Z")+864e5).toISOString().slice(0,10) : date;
+    return {mm:mm.slice(bi,bi+DAY_H), start:h%24, date:d};
+  }
   const dayFb = () => { const c=calibrate(DAY_FB.date,FALLBACK.lat,FALLBACK.lon,DAY_FB.mm,DAY_FB.event);
-    return {date:DAY_FB.date, start:DAY_FB.start, mm:c.mm, calib:c.calib, place:FALLBACK.place, live:false, day:true}; };
+    return {...wettest(c.mm, DAY_FB.start, DAY_FB.date), calib:c.calib, place:FALLBACK.place, live:false, day:true}; };
   let DAY = dayFb();
   let PAST = fb(), FC = null;      // FC: {date,start,mm,place} ya da {none:true}
   const RR = window.REALRAIN = {on:false, mode:"past", ...PAST};  // varsayılan: kapalı (Aşırı sağanak); çipten seçilir
@@ -123,18 +133,18 @@ if(document.readyState === "loading"){
     if(!FC){ chipF.textContent = "🔮 Tahmin · yükleniyor…"; chipF.disabled = true; }
     else if(FC.none){ chipF.textContent = "🔮 Tahmin · 3 günde yağış yok"; chipF.disabled = true; chipF.title = "Önümüzdeki 3 günde kayda değer yağış beklenmiyor"; }
     else { chipF.textContent = `🔮 Tahmin · ${trDate(FC.date)} ${hh(FC.start)}:00${FC.totals?` · ${fmt(FC.totals.p10,0)}–${fmt(FC.totals.p90,0)} mm`:""}`; chipF.disabled = false; chipF.title = ""; }
-    chipD.textContent = `14 Ekim 2026 · tüm gün · saat saat · ~${fmt(DAY.mm.reduce((a,v)=>a+v,0),0)} mm`;
-    chipD.title = "14 Ekim sağanağının bu bölgedeki en yağışlı 24 saati, saat saat: dağılım Open-Meteo modelinden, toplam yakındaki AKOM ölçümlerine göre ölçeklendi";
+    chipD.textContent = `14 Ekim 2026 · 12 saat, saat saat · ~${fmt(DAY.mm.reduce((a,v)=>a+v,0),0)} mm`;
+    chipD.title = "14 Ekim sağanağının bu bölgedeki en yağışlı 12 saati, saat saat: dağılım Open-Meteo modelinden, 24 saatlik toplam yakındaki AKOM ölçümlerine göre ölçeklendi";
     chipD.classList.toggle("on", RR.on && RR.mode==="day");
     chipP.classList.toggle("on", RR.on && RR.mode==="past");
     chipF.classList.toggle("on", RR.on && RR.mode==="fc");
     if(RR.on && RR.mode==="fc" && fcSec.hidden) fcOpen(true);
     box.hidden = !RR.on;
     if(!RR.on) return;
-    // kaydırıcı etiketleri: gerçek veri saat saat değişir (tüm gün 24 saat, kaydırıcının 12 saat sınırını aşar)
+    // kaydırıcı etiketleri: gerçek veride şiddet saat saat değişir
     $("rateV").textContent = "saat saat değişiyor"; $("durV").textContent = `${RR.mm.length} saat → ${fmt(total(),0)} mm`;
     const end = RR.start + RR.mm.length;
-    $("rrTitle").textContent = `${RR.mode==="fc"?"Tahmin · ":RR.mode==="day"?"Tüm gün · ":""}${trDate(RR.date)} · ${hh(RR.start)}:00–${end>=24&&end%24===0?"24":hh(end)}:00 · ${fmt(total(),1)} mm`;
+    $("rrTitle").textContent = `${RR.mode==="fc"?"Tahmin · ":RR.mode==="day"?"En yağışlı 12 saat · ":""}${trDate(RR.date)} · ${hh(RR.start)}:00–${end>=24&&end%24===0?"24":hh(end)}:00 · ${fmt(total(),1)} mm`;
     const band = RR.mode==="fc" && RR.band, h = hourNow();
     const mx = Math.max(...RR.mm, ...(band?band.hi:[]), 1);
     $("rrBars").innerHTML = RR.mm.map((v,i)=>{
@@ -224,7 +234,7 @@ if(document.readyState === "loading"){
       for(let i=1;i+24<=p.length;i++){ let s=0; for(let k=0;k<24;k++) s+=p[i+k]; if(s>best){best=s;bi=i;} }
       if(bi<1 || best<5){ DAY = dayFb(); return; }
       const mm = p.slice(bi,bi+24), sk = t[bi-1], c = calibrate(OBS.date, lat, lon, mm, best);
-      DAY = {date:sk.slice(0,10), start:+sk.slice(11,13), mm:c.mm.map(v=>+(+v).toFixed(1)), calib:c.calib, place:name, live:true, day:true};
+      DAY = {...wettest(c.mm.map(v=>+(+v).toFixed(1)), +sk.slice(11,13), sk.slice(0,10)), calib:c.calib, place:name, live:true, day:true};
     }catch(e){ /* alınamadı: Kağıthane yedeği kalır */ }
   }
 
