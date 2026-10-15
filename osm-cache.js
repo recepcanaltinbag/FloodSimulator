@@ -10,11 +10,27 @@
   load();
 
   const inside = (box, lat, lon) => lat>=box[0] && lat<=box[2] && lon>=box[1] && lon<=box[3];
+  const contains = (outer, inner) => inner[0]>=outer[0] && inner[1]>=outer[1] && inner[2]<=outer[2] && inner[3]<=outer[3];
+
+  // Hazır bölgeler için göl/baraj + ana yol/demiryolu verisi (kapalı çukur analizi): data/osm_area/*.json.
+  // İstenen alan kayıtlı bir alanın içinde kalıyorsa veri GitHub'dan gelir, Overpass'a gidilmez.
+  let AREAS = null; const areaFiles = new Map();
+  const loadAreas = () => AREAS || (AREAS = fetch("data/osm_area/index.json").then(r => r.ok ? r.json() : null).catch(() => null));
+  async function areaFor(box){
+    const ix = await loadAreas(); if(!ix || !ix.areas) return null;
+    const a = ix.areas.find(x => contains(x.bbox, box)); if(!a) return null;
+    if(!areaFiles.has(a.key)) areaFiles.set(a.key, fetch(`data/osm_area/${a.key}.json`).then(r => r.ok ? r.json() : null).catch(() => null));
+    return areaFiles.get(a.key);
+  }
 
   const orig = overpass;
   overpass = async function(q){
     const m = /\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/.exec(q);
-    const isDere = /waterway/.test(q) && /dere/.test(q), isLabel = /"place"/.test(q);
+    const isDere = /waterway/.test(q) && /dere/.test(q), isLabel = /"place"/.test(q), isWater = /"natural"="water"/.test(q);
+    if(m && isWater){
+      const js = await areaFor(m.slice(1,5).map(Number));
+      if(js && js.elements) return {elements: js.elements, cached: true};
+    }
     if(m && (isDere || isLabel)){
       const box = m.slice(1,5).map(Number);              // güney, batı, kuzey, doğu
       const js = await load();

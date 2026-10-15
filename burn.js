@@ -10,6 +10,13 @@
   const BANK = 0.4;       // m: yanlara indirilen hücreler oluk tabanının bu kadar üstünde kalır
   const BURN = window.BURN = {on:true, vis:null, visual:null, reg:null, cells:0, maxCut:0, lines:0};
 
+  // çukur analizi yeniden yapılınca (DEPR yenilenir) göl/yol kontrolü de yinelenmeli; yoksa önceki depCheck'in
+  // cevabı eski listeye ait sayılıp atılır ve durum "göl verisi kontrol ediliyor…"da kalır
+  function reprep(){
+    if(typeof karstPrep!=="function") return;
+    try{ karstPrep(); }catch(e){ console.warn("karstPrep", e); return; }
+    if(typeof depCheck==="function" && typeof DEPR!=="undefined" && DEPR && DEPR.status==="bekliyor") depCheck().catch(e=>console.warn("depCheck", e));
+  }
   // polyline (ızgara koordinatı) → 4-komşu bağlantılı hücre dizisi
   function rasterize(pts){
     const out=[];
@@ -74,7 +81,7 @@
     // görüntü: düzeltilmiş arazi; yalnızca büyük kesiklerde (köprü/viyadük tablası) özgün yükseklik kalır
     const vis = BURN.vis, V = BURN.visual = new Float32Array(b.length);
     for(let i=0;i<b.length;i++) V[i] = vis[i]-b[i] > DECK ? vis[i] : b[i];
-    if(typeof karstPrep==="function"){ try{ karstPrep(); }catch(e){ console.warn("karstPrep", e); } }
+    reprep();
     if(typeof rebuildTerrainZ==="function" && typeof terrainMesh!=="undefined" && terrainMesh){ try{ rebuildTerrainZ(); }catch(e){ console.warn("rebuildTerrainZ", e); } }
     else if(typeof updateWaterMesh==="function") updateWaterMesh();
   }
@@ -112,7 +119,7 @@
     document.getElementById("burnOn").onchange = e => {
       BURN.on = e.target.checked;
       if(!BURN.vis || BURN.reg !== REG) return;
-      if(BURN.on) burn(); else { b.set(BURN.vis); if(typeof karstPrep==="function") karstPrep(); if(typeof rebuildTerrainZ==="function") rebuildTerrainZ(); }
+      if(BURN.on) burn(); else { b.set(BURN.vis); reprep(); if(typeof rebuildTerrainZ==="function") rebuildTerrainZ(); }
     };
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", addToggle); else addToggle();
