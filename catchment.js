@@ -4,7 +4,7 @@
 // Not: yalnızca simülasyon penceresi içindeki alan sayılır; Rasyonel Yöntem küçük havzalar (≲5 km²) içindir.
 // index.html'deki globallere (N, S, b, sea, REG, KARST, dereCanvas, dereTex, drawDereOverlay, fmt) dayanır.
 (function(){
-  const CA = window.CATCH = {cells:null, pour:-1, key:null, info:null};
+  const CA = window.CATCH = {cells:null, pour:-1, key:null, info:null, open:false};
   const css = document.createElement("style");
   css.textContent = `
     #catchBox{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;width:min(380px,calc(100% - 24px));max-height:70%;overflow:auto;
@@ -16,7 +16,11 @@
     #catchBox td:first-child,#catchBox th:first-child{text-align:left}
     #catchBox tr.cur td{color:var(--accent);font-weight:600}
     #catchBox .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin-top:6px}
-    #catchBox .kv b{text-align:right}`;
+    #catchBox .kv b{text-align:right}
+    #catchBox .sum{cursor:pointer;font-weight:700;font-size:13.5px;padding-right:22px}
+    #catchBox .sum small{font-weight:500;color:var(--muted)}
+    #catchBox .more[hidden]{display:none}
+    #catchBox.compact{padding:8px 12px}`;
   document.head.appendChild(css);
   const box = document.createElement("div"); box.id = "catchBox"; box.hidden = true;
   (document.getElementById("view") || document.body).appendChild(box);
@@ -69,8 +73,13 @@
     const rows = rates.map(i => { const Q = C.c*i*Akm2/3.6, V = C.c*i/1000*A; return `<tr class="${i===S.rate?"cur":""}"><td>${i} mm/sa${i===S.rate?" (şimdiki)":""}</td><td>${fmt(Q, Q<10?2:0)} m³/sn</td><td>${V>1e6?fmt(V/1e6,2)+" milyon":fmt(V)} m³</td></tr>`; }).join("");
     const p = (typeof px2ll==="function") ? px2ll(REG.x0+2*(pour%N)+1, REG.y0+2*Math.floor(pour/N)+1, REG.n) : null;
     CA.cells = U.inC; CA.pour = pour; CA.key = LC.down;
+    const Qnow = C.c*S.rate*Akm2/3.6;
+    box.className = CA.open ? "" : "compact";
     box.innerHTML = `<button class="x" title="Kapat">✕</button>
-      <div style="font-weight:700;font-size:14px">💧 Drenaj alanı</div>
+      <div class="sum">💧 ${Akm2<1?fmt(A/1e4,1)+" ha":fmt(Akm2,2)+" km²"} · ~${fmt(tc)} dk · <span style="color:var(--accent)">${S.rate} mm/sa'te ${fmt(Qnow, Qnow<10?2:0)} m³/sn</span>
+        <small>${CA.open?"▴ gizle":"▾ ayrıntı"}</small></div>
+      <div class="more" ${CA.open?"":"hidden"}>
+      <div style="font-weight:700;font-size:14px;margin-top:6px">Drenaj alanı</div>
       <div class="muted">${p?`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · `:""}çıkış noktası ${fmt(H[pour])} m</div>
       <div class="kv">
         <span>Drenaj alanı</span><b>${Akm2<1?fmt(A/1e4,1)+" ha":fmt(Akm2,2)+" km²"}</b>
@@ -82,11 +91,27 @@
       <table><tr><th>Yağış</th><th>Tepe debi</th><th>1 saatte gelen su</th></tr>${rows}</table>
       <div class="muted" style="margin-top:6px;font-size:11px">Rasyonel Yöntem (Q = C·i·A/3,6): yağış, toplanma süresinden (~${fmt(tc)} dk) uzun sürerse tepe debiye ulaşılır.
         ${Akm2>5?"<b>Bu havza büyük; Rasyonel Yöntem debiyi abartabilir.</b> ":""}${edge?"<b>Havza simülasyon alanının dışına taşıyor; dışarıdaki kısım sayılmadı</b> (alanı kaydırırsan büyüyebilir). ":""}
-        Kanalizasyon ve zemin emmesi C katsayısıyla kabaca temsil edilir. Gösterim amaçlıdır.</div>`;
+        Kanalizasyon ve zemin emmesi C katsayısıyla kabaca temsil edilir. Gösterim amaçlıdır.</div>
+      </div>`;
     box.querySelector(".x").onclick = hide;
+    box.querySelector(".sum").onclick = () => { CA.open = !CA.open; box.classList.toggle("compact", !CA.open);
+      box.querySelector(".more").hidden = !CA.open; box.querySelector(".sum small").textContent = CA.open ? "▴ gizle" : "▾ ayrıntı"; };
     box.hidden = false;
+    fitCamera(U.list);
     drawDereOverlay();
   }
+  // kamerayı havzanın tamamı görünecek şekilde yumuşakça uçur (üstteki özet panel için biraz aşağı kaydırarak)
+  function fitCamera(list){
+    if(typeof setView !== "function" || typeof controls === "undefined") return;
+    let x0=N, x1=0, y0=N, y1=0; for(const i of list){ const x=i%N, y=(i-x)/N; if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+    const toW = v => (v/(N-1) - .5)*SIZE, H0 = (window.BURN&&BURN.visual&&BURN.visual.length===b.length) ? BURN.visual : b;
+    const cx = toW((x0+x1)/2), cz = toW((y0+y1)/2), ext = Math.max(toW(x1)-toW(x0), toW(y1)-toW(y0), 6);
+    const ci = Math.round((y0+y1)/2)*N + Math.round((x0+x1)/2), cy = Math.max(0, H0[ci]||0)*sc()*S.ex;
+    const fov = (camera.fov||45)*Math.PI/180, dist = Math.min(controls.maxDistance||500, Math.max(12, ext*0.75/Math.tan(fov/2)));
+    const polar = Math.min(Math.max(controls.getPolarAngle(), 0.55), 0.95);
+    setView(polar, controls.getAzimuthalAngle(), dist, new THREE.Vector3(cx, cy, cz));
+  }
+
   function hide(){ box.hidden = true; CA.cells = null; CA.pour = -1; drawDereOverlay(); }
   CA.show = show; CA.hide = hide;
 
@@ -98,8 +123,14 @@
       try{
         if(!CA.cells || !window.LOSTCREEK || CA.key !== LOSTCREEK.down || !dereCanvas) return r;
         const g = dereCanvas.getContext("2d"), f = dereCanvas.width/(N-1);
-        g.save(); g.fillStyle = "rgba(255,196,60,0.28)";
-        for(let i=0;i<N*N;i++){ if(!CA.cells[i]) continue; const x=i%N, y=(i-x)/N; g.fillRect(x*f-f/2, y*f-f/2, f, f); }
+        g.save(); g.fillStyle = "rgba(255,196,60,0.16)";
+        const C = CA.cells, edge = [];
+        for(let i=0;i<N*N;i++){ if(!C[i]) continue; const x=i%N, y=(i-x)/N; g.fillRect(x*f-f/2, y*f-f/2, f, f);
+          if(x===0||!C[i-1]) edge.push([x-.5,y-.5,x-.5,y+.5]); if(x===N-1||!C[i+1]) edge.push([x+.5,y-.5,x+.5,y+.5]);
+          if(y===0||!C[i-N]) edge.push([x-.5,y-.5,x+.5,y-.5]); if(y===N-1||!C[i+N]) edge.push([x-.5,y+.5,x+.5,y+.5]); }
+        // havza sınırı: koyu gölge + turuncu çizgi
+        for(const [w,col] of [[5,"rgba(0,0,0,.55)"],[2.5,"#ffb020"]]){ g.lineWidth=w; g.strokeStyle=col; g.lineCap="round"; g.beginPath();
+          for(const [a,b2,c,e] of edge){ g.moveTo(a*f,b2*f); g.lineTo(c*f,e*f); } g.stroke(); }
         const px = (CA.pour%N)*f, py = Math.floor(CA.pour/N)*f;
         g.fillStyle = "#ffb020"; g.strokeStyle = "#000"; g.lineWidth = 2; g.beginPath(); g.arc(px, py, 7, 0, 7); g.fill(); g.stroke();
         g.restore(); dereTex.needsUpdate = true;
