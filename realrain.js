@@ -170,6 +170,8 @@ if(document.readyState === "loading"){
     const src = mode==="fc" ? FC : mode==="day" ? DAY : PAST;
     if(!src || src.none) return;
     Object.assign(RR, {on:true, mode, calib:null, band:null, variants:null, ...src});
+    S.scen = mode==="fc" ? `Tahmin · ${trDate(RR.date)}` : mode==="day" ? "14 Ekim 2026 · 12 saat" : `${trDate(RR.date)} akşamı`;
+    if(typeof scenNote==="function") scenNote(false);
     S.durH = RR.mm.length; $("dur").value = RR.mm.length;
     render();
   }

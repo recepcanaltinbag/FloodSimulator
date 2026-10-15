@@ -78,6 +78,12 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
 .hud{z-index:4;position:absolute;left:12px;top:12px;background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;backdrop-filter:blur(6px);max-width:calc(100% - 290px)}
 .hud b{font-size:15px}
+.hud .scenTag{display:inline-block;background:rgba(255,176,32,.16);border:1px solid rgba(255,176,32,.45);color:#ffd27a;border-radius:999px;padding:1px 8px;margin-right:4px;font-size:12px;font-weight:600}
+#scenNote{position:absolute;z-index:6;left:50%;bottom:16px;transform:translateX(-50%);width:min(520px,calc(100% - 24px));background:rgba(17,22,30,.96);border:1px solid rgba(255,176,32,.5);border-radius:12px;padding:10px 12px 10px 14px;font-size:13px;line-height:1.45;box-shadow:0 12px 30px rgba(0,0,0,.5);display:flex;gap:10px;align-items:flex-start}
+#scenNote[hidden]{display:none}
+#scenNote b{color:#ffd27a}
+#scenNote button{flex:none;border:1px solid var(--line);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+@media (max-width:900px){#scenNote{bottom:12px;font-size:12.5px}.hud .scenTag{white-space:nowrap;font-size:11px}}
 .legend{position:absolute;left:12px;bottom:12px;background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:11px;backdrop-filter:blur(6px)}
 .legend .bar{width:150px;height:9px;border-radius:4px;background:linear-gradient(90deg,rgb(150,210,255),rgb(60,140,240),rgb(10,40,140));margin:4px 0}
 .legend .ticks{display:flex;justify-content:space-between;color:var(--muted)}
@@ -465,6 +471,10 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <button class="btn sm mm-back" id="mmBack">↩ Önceki bölgeye dön</button>
     </div>
     <div class="hud" id="hud">—</div>
+    <div id="scenNote" role="note" hidden>
+      <div>ℹ️ <b>Bu canlı hava durumu değil.</b> Ekranda <b>14 Ekim 2026</b> akşamki sağanağın en sert 3 saatinin yeniden canlandırması (simülasyon) oynuyor; şu an böyle bir yağış yok. Başka yağış senaryoları <b>⚙️ Ayarlar</b>'da.</div>
+      <button id="scenNoteX">Anladım</button>
+    </div>
     <div class="legend">
       <div>Su derinliği</div><div class="bar"></div><div class="ticks"><span>5 cm</span><span>1 m</span><span>3 m+</span></div>
       <div class="row"><span class="sw" style="background:var(--amber)"></span>"Dere" adlı yol (kuru)</div>
@@ -539,7 +549,7 @@ const SCEN = [
   // Open-Meteo saatlik model eğrisinde en sert saatler 18:00–21:00 (model 24 saatte 80 mm, AKOM 22:22'de 225,8 mm → ×2,8 ölçekle)
   // bu üç saat ~124 mm, en sert saat ~57 mm. Burada o üç saat: 40 mm/sa · 3 sa
   // 14 Ekim'de sabahtan (ve 13 Ekim'den) beri yağıyordu: zemin bu saatlere doygun girdi → "Önceki günler: Doygun"
-  {n:"14 Ekim 2026 · en sert 3 saat", r:40, d:3, ante:"sat", t:"Zemin doygun başlar: sabahtan beri yağıyordu. 14 Ekim 2026 akşamı Beykoz, 18:00–21:00 · yaklaşık 120 mm (en sert saatte ~55 mm). Günün tamamında 242–277 mm düştü (AKOM). Saatlik değerler model eğrisinin ölçümle ölçeklenmesinden tahmindir"},
+  {n:"14 Ekim 2026 · en sert 3 saat", h:"14 Ekim 2026", r:40, d:3, ante:"sat", t:"Zemin doygun başlar: sabahtan beri yağıyordu. 14 Ekim 2026 akşamı Beykoz, 18:00–21:00 · yaklaşık 120 mm (en sert saatte ~55 mm). Günün tamamında 242–277 mm düştü (AKOM). Saatlik değerler model eğrisinin ölçümle ölçeklenmesinden tahmindir"},
   // aşağıdakiler gizli bölümde: İstanbul'da hiç görülmemiş ya da Türkiye rekoru düzeyinde
   // iklim değişikliği: ısınan hava ~%7/°C daha fazla nem taşır, kısa süreli sağanaklarda artış daha da yüksek olabilir;
   // +2–3 °C ısınmada 2009 Ayamama yağışının ~%30 daha şiddetlisi
@@ -571,7 +581,7 @@ const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 const SOILS = {"0":{f0:0,fc:0,k:2}, "2":{f0:6,fc:1,k:4}, "8":{f0:30,fc:3,k:2}, "25":{f0:75,fc:10,k:2}, "80":{f0:150,fc:60,k:1}};
 const ANTE = {dry:0, wet:1, sat:3};   // başlangıç ıslaklığı (x): kuru, nemli (kapasite ~%37'ye inmiş), doygun (~%5)
 const infCap = () => S.soil.fc + (S.soil.f0 - S.soil.fc)*Math.exp(-S.wetX);
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:3, wetX:3, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, scen:"14 Ekim 2026", rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:3, wetX:3, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -724,7 +734,7 @@ SCEN.forEach(s=>{
   const c=document.createElement("button"); c.className="chip"+(s.x?" xs":""); c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
   if(s.t) c.title=s.t;
   if(s.n==="14 Ekim 2026 · en sert 3 saat") c.classList.add("on"); // varsayılan senaryo
-  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; if(s.ante) $("ante").value=s.ante; uiUpd(); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
+  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; if(s.ante) $("ante").value=s.ante; S.scen=s.h||s.n; uiUpd(); scenNote(false); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
   (s.x?scenX:$("scen")).appendChild(c);
 });
 $("scen").append(scenXb, scenX);
@@ -749,6 +759,7 @@ function soilUI(){
     `Zemin şu an saatte ${fmt(S.inf,1)} mm emiyor. Kuruyken ${p.f0} mm/sa emer, ıslandıkça ${p.fc} mm/sa'e iner (Horton). Yukarı havzaya da aynısı uygulanır.`;
 }
 ["rate","dur","soil","ante","spd","ex","sewer","blk"].forEach(id=>$(id).oninput=uiUpd); uiUpd();
+["rate","dur"].forEach(id=>$(id).addEventListener("input",()=>{ S.scen="Elle ayar"; scenNote(false); }));
 $("tex").onchange=applyTexture;
 $("play").onclick=()=>{ S.running=!S.running; updPlay(); };
 $("reset").onclick=()=>{ resetWater(); S.running=S.loaded; updPlay(); }; // baştan başlat, yağmur hemen yeniden yağar
@@ -2318,8 +2329,10 @@ function updStats(){
   const raining=S.simT<S.durH*3600;
   $("liveSt").textContent = S.simT===0 ? `${S.name} · hazır` :
     `${raining?"🌧️":"☁️"} ${S.rate} mm/sa · ${$("sT").textContent}${S.running?"":" · duraklatıldı"}`;
-  $("hud").innerHTML = S.simT===0 ? `<b>${S.name}</b><br><span class="muted">Yağmur başlıyor…</span>` :
-    (raining ? `🌧️ Yağıyor · <b>${S.rate} mm/sa</b>` : "☁️ Yağmur durdu · su çekiliyor/birikiyor") +
+  // gösterilen yağış canlı hava değil: senaryonun adı her zaman ilk satırda (telefonda tek satır kalan da bu)
+  const fc=/^Tahmin/.test(S.scen), tag=`<span class="scenTag">${fc?"🔮":"🎬"} ${S.scen}${fc?"":" · senaryo"}</span>`;
+  $("hud").innerHTML = S.simT===0 ? `${tag}<br><b>${S.name}</b> · <span class="muted">Yağmur başlıyor…</span>` :
+    tag + " " + (raining ? `🌧️ <b>${S.rate} mm/sa</b>` : "☁️ yağmur durdu") +
     (full>95 && raining ? `<br><span style="color:var(--warn)">⚠️ Kanalizasyon dolu, ızgaralar suyu alamıyor</span>` : "") +
     (KARST.on ? `<br><span style="color:#3fd6d6">🕳️ Karst modu · ${KARST.ponors.length} düden · yeraltına ${uv(S.under)}</span>` :
      SINK ? `<br><span style="color:#c58cff">🕳️ Kapalı çukurlar boşalıyor · yeraltına ${uv(S.under)}</span>` : "") +
@@ -2648,6 +2661,10 @@ async function mmSearch(){
 }
 addEventListener("keydown",e=>{ if(e.key==="Escape" && MM.on && $("picker").hidden && document.activeElement!==$("mmQ")) $("mmBack").click(); });
 
+// açılıştaki senaryo uyarısı: "Anladım"a basılana kadar her girişte görünür; başka senaryo seçilince kapanır
+function scenNote(show){ const n=$("scenNote"); if(n) n.hidden=!show; }
+$("scenNoteX").onclick=()=>{ scenNote(false); try{ localStorage.setItem("scenNoteOk","1"); }catch(e){} };
+try{ if(localStorage.getItem("scenNoteOk")!=="1") scenNote(true); }catch(e){ scenNote(true); }
 // İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, 14 Ekim 2026 yağışı) yüklenir ve yağmur kendiliğinden başlar
 loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 </script>
