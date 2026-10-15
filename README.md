@@ -4,6 +4,8 @@ Tarayıcıda çalışan, gerçek yükseklik verisi üzerinde 3B yağış ve yüz
 
 **▶ Canlı:** https://recepcanaltinbag.github.io/FloodSimulator/
 
+**📖 Nasıl çalışır?** Yağış, zemin emişi, kanalizasyon, akış ve modelin sınırları sade dille: https://recepcanaltinbag.github.io/FloodSimulator/bilgi.html
+
 ![Önizleme](og.jpg)
 
 Kurulum gerekmez; tek bir HTML sayfası ve yardımcı betiklerden oluşur, telefonda da çalışır. Eğitim ve farkındalık amaçlıdır; mühendislik hesabı ya da resmî taşkın risk haritası yerine geçmez (bkz. [Sınırlamalar](#sınırlamalar)).

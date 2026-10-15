@@ -348,7 +348,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 <div class="top">
   <h1>🌧️ Yağış ve Sel Simülasyonu</h1>
   <p class="sub">Uydu yükseklik verisi (SRTM tabanlı DEM) üzerinde yağmur suyunun akışı ve birikmesi.</p>
-  <p class="sub gh"><a href="https://github.com/recepcanaltinbag/FloodSimulator" target="_blank" rel="noopener">GitHub'da kaynak kod ↗</a> · <a href="https://github.com/recepcanaltinbag/FloodSimulator/blob/main/docs/dogrulama-14ekim.md" target="_blank" rel="noopener">Ne kadar doğru? ↗</a></p>
+  <p class="sub gh"><a href="bilgi.html">📖 Nasıl çalışır?</a> · <a href="https://github.com/recepcanaltinbag/FloodSimulator" target="_blank" rel="noopener">GitHub'da kaynak kod ↗</a> · <a href="https://github.com/recepcanaltinbag/FloodSimulator/blob/main/docs/dogrulama-14ekim.md" target="_blank" rel="noopener">Ne kadar doğru? ↗</a></p>
 
   <div class="live">
     <span id="liveSt" class="muted">Yükleniyor…</span>
@@ -454,6 +454,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <p class="note">
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür, ama oraya düşen yağmurun bu alana akan kısmı kaba bir havza modeliyle kenardan girer ("Havzadan gelen su"); kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
+    Yağış, zemin emişi, akış ve modelin sınırları sade dille: <a href="bilgi.html">📖 Nasıl çalışır?</a><br>
     Kaynak kod, yöntem ve doğrulama: <a href="https://github.com/recepcanaltinbag/FloodSimulator" target="_blank" rel="noopener">github.com/recepcanaltinbag/FloodSimulator</a> (MIT; veriler kendi lisanslarıyla).<br><br>
     Veri: AWS Terrain Tiles (SRTM vd.) · FABDEM v1-2 (Hawker vd. 2022, “A 30 m global map of elevation with forests and buildings removed”, Environ. Res. Lett. 17 024016; University of Bristol, CC BY-NC-SA 4.0; karst/dağ/Kağıthane karoları bu lisansla türetildi) — Copernicus WorldDEM-30 © DLR e.V. 2010-2014 ve © Airbus Defence and Space GmbH 2014-2018, Copernicus programı kapsamında AB ve ESA tarafından sağlanmıştır; tüm hakları saklıdır · isteğe bağlı olarak kullanıcının kendi DEM dosyası (yalnızca tarayıcıda okunur; geotiff.js, proj4js) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
   </p>
