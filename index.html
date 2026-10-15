@@ -2332,6 +2332,10 @@ $("nHome").onclick=()=>setView(Math.atan2(180,140),0,Math.hypot(140,180),new THR
 // İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, Abartılı görsel) yüklenir ve yağmur kendiliğinden başlar
 loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 </script>
-<script src="realrain.js"></script>
+<script>
+// yardımcı betikler: GitHub Pages 10 dk önbellekler; 5 dakikalık sürüm ekiyle güncellemeler hızlı gelsin
+window.ASSET_V = Math.floor(Date.now()/3e5);
+document.write('<script src="realrain.js?v='+ASSET_V+'"><\/script>');
+</script>
 </body>
 </html>
