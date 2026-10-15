@@ -36,12 +36,14 @@
     return {c:0.35, t:"toprak / orman"};
   }
 
-  function upstream(pour){
+  // seeds: tek hücre yerine tıklanan yerin çevresi; her tohumun çıkışa uzaklığı (m) da verilir
+  function upstream(pour, seeds){
     const LC = window.LOSTCREEK, down = LC.down, n = N*N;
     // ters komşuluk (bağlı liste)
     const head = new Int32Array(n).fill(-1), next = new Int32Array(n).fill(-1);
     for(let i=0;i<n;i++){ const j = down[i]; if(j >= 0){ next[i] = head[j]; head[j] = i; } }
     const inC = new Uint8Array(n), dist = new Float32Array(n), q = [pour]; inC[pour] = 1;
+    for(const [i, dm] of (seeds||[])) if(!inC[i]){ inC[i] = 1; dist[i] = dm; q.push(i); }
     let far = pour;
     for(let h=0; h<q.length; h++){
       const j = q[h];
@@ -64,7 +66,13 @@
     let pour = y*N+x;
     for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){ if(dx*dx+dy*dy>16) continue; const xx=x+dx, yy=y+dy; if(xx<0||yy<0||xx>=N||yy>=N) continue; const j=yy*N+xx; if(!sea[j] && LC.acc[j] > LC.acc[pour]) pour = j; }
     if(sea[pour]){ alert("Deniz üzerinde drenaj alanı hesaplanmaz."); return; }
-    const U = upstream(pour), H = (window.BURN && BURN.vis && BURN.vis.length===b.length) ? BURN.vis : b;
+    // tek hücre yerine çevre: tıklanan yerin ~SEED_M yarıçapındaki tüm hücrelerin yukarı havzası birleştirilir.
+    // Kaba DEM'de akış hattı bir hücre kayabildiği için tek hücrelik çıkış bazen yalnızca birkaç hücrelik havza verir.
+    const SEED_M = 90, rr = Math.max(1, Math.round(SEED_M/S.cell)), seeds = [];
+    const px = pour%N, py = Math.floor(pour/N);
+    for(let dy=-rr;dy<=rr;dy++) for(let dx=-rr;dx<=rr;dx++){ if(dx*dx+dy*dy>rr*rr) continue; const xx=x+dx, yy=y+dy;
+      if(xx<0||yy<0||xx>=N||yy>=N) continue; const j=yy*N+xx; if(!sea[j]) seeds.push([j, Math.hypot(xx-px, yy-py)*S.cell]); }
+    const U = upstream(pour, seeds), H = (window.BURN && BURN.vis && BURN.vis.length===b.length) ? BURN.vis : b;
     const Ain = U.count*S.cell*S.cell;
     // pencere dışındaki yukarı havza: kenardan bu havzaya giren girişlerin alanı (havza girişi analizi, ~115 m)
     let Aext = 0, nIn = 0; const inflows = [];
@@ -90,7 +98,7 @@
         <small>${CA.open?"▴ gizle":"▾ ayrıntı"}</small></div>
       <div class="more" ${CA.open?"":"hidden"}>
       <div style="font-weight:700;font-size:14px;margin-top:6px">Drenaj alanı</div>
-      <div class="muted">${p?`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · `:""}çıkış noktası ${fmt(H[pour])} m</div>
+      <div class="muted">${p?`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · `:""}çıkış noktası ${fmt(H[pour])} m · tıklanan yerin ~${fmt(rr*S.cell)} m çevresine akan alan</div>
       <div class="kv">
         <span>Drenaj alanı</span><b>${fmtA(A)}</b>
         ${Aext>0?`<span class="muted">· pencere içi / dışarıdan</span><b class="muted" style="font-weight:500">${fmtA(Ain)} + ${fmtA(Aext)}</b>`:""}
