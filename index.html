@@ -1335,7 +1335,7 @@ function drawDereOverlay(){
   if(!DERE){ dereTex.needsUpdate=true; return; }
   g.lineCap=g.lineJoin="round";
   if($("showWater").checked){
-    g.strokeStyle="#22e0ff"; g.lineWidth=1.4;
+    g.strokeStyle="#22e0ff"; g.lineWidth=2.5;
     for(const w of DERE.ways){
       g.setLineDash(w.tunnel?[6,6]:[]);
       g.beginPath(); w.pts.forEach((p,i)=>i?g.lineTo(p.g[0]*f,p.g[1]*f):g.moveTo(p.g[0]*f,p.g[1]*f)); g.stroke();
@@ -1349,7 +1349,7 @@ function drawDereOverlay(){
         const a=r.pts[i-1].g, c=r.pts[i].g;
         const mx=Math.round((a[0]+c[0])/2), my=Math.round((a[1]+c[1])/2);
         const wet = d && mx>=0&&my>=0&&mx<N&&my<N && !sea[my*N+mx] && d[my*N+mx]>0.1;
-        g.strokeStyle= wet?"#ff4d4d":"#ffb020"; g.lineWidth= wet?2.6:1.8;
+        g.strokeStyle= wet?"#ff4d4d":"#ffb020"; g.lineWidth= wet?5:3.5;
         g.beginPath(); g.moveTo(a[0]*f,a[1]*f); g.lineTo(c[0]*f,c[1]*f); g.stroke();
       }
     }
