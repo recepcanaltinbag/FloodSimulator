@@ -146,7 +146,7 @@ if(document.readyState === "loading"){
   chipP.onclick = () => { use("past"); restart(); };
   chipF.onclick = () => { use("fc"); restart(); };
   // başka bir senaryo ya da elle ayar → gerçek veri kapanır
-  scen.addEventListener("click", e => { const c=e.target.closest(".chip"); if(c && c!==chipP && c!==chipF) off(); });
+  scen.addEventListener("click", e => { const c=e.target.closest(".chip"); if(c && c!==chipP && c!==chipF && !c.classList.contains("scenXb")) off(); });
   ["rate","dur"].forEach(id => $(id).addEventListener("input", off));
 
   // --- seçilen bölge için dünkü yağış + 3 günlük tahmin ---

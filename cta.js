@@ -28,7 +28,7 @@
   // senaryo/ayar değişiklikleri (simülasyon zaten ilerlemişse)
   const markDirty = () => { if(S.simT > 60) dirty = true; };
   ["rate","dur","soil","sewer","blk"].forEach(id => { const el = $(id); if(el){ el.addEventListener("input", markDirty); el.addEventListener("change", markDirty); } });
-  const scen = $("scen"); if(scen) scen.addEventListener("click", e => { if(e.target.closest(".chip")) setTimeout(() => { if(S.simT > 60) dirty = true; }, 0); });
+  const scen = $("scen"); if(scen) scen.addEventListener("click", e => { if(e.target.closest(".chip:not(.scenXb)")) setTimeout(() => { if(S.simT > 60) dirty = true; }, 0); });
   $("reset").addEventListener("click", () => { dirty = false; });
 
   function tick(){

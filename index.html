@@ -48,6 +48,12 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mute
 .chip{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
 .chip:hover{border-color:var(--accent)}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#04121f}
+#scenX{flex-basis:100%;padding:6px 8px;border:1px dashed rgba(255,120,90,.45);border-radius:10px;background:rgba(255,90,60,.06)}
+#scenX[hidden]{display:none}
+.scenXn{flex-basis:100%;font-size:11.5px;color:var(--muted);margin-bottom:2px}
+.chip.xs{border-color:rgba(255,120,90,.55);color:#ffb4a0}
+.chip.xs.on{background:#ff7a5a;border-color:#ff7a5a;color:#1a0904}
+.chip.scenXb{border-style:dashed;color:#ffb4a0;border-color:rgba(255,120,90,.45)}
 .ctrl{margin-bottom:12px}
 .ctrl label{display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px;font-size:13px}
 .ctrl label span{color:var(--accent);font-weight:500}
@@ -345,7 +351,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="chips" id="scen" style="margin-bottom:10px"></div>
   <div class="ctrl">
     <label>Yağış şiddeti <span id="rateV"></span></label>
-    <input type="range" id="rate" min="5" max="200" step="5" value="100">
+    <input type="range" id="rate" min="5" max="200" step="5" value="90">
   </div>
   <div class="ctrl">
     <label>Yağış süresi <span id="durV"></span></label>
@@ -508,10 +514,14 @@ const SIZES = {s:{z:14,t:"Küçük",d:"~3,7 km · en detaylı"}, m:{z:13,t:"Orta
 const QUALS = {1:{t:"Hızlı",d:"1024 px"}, 2:{t:"Yüksek",d:"2048 px"}, 3:{t:"En yüksek",d:"4096 px"}};
 const SCEN = [
   {n:"Kuvvetli yağış", r:20, d:1},
-  {n:"Sağanak", r:50, d:2},
-  {n:"Aşırı sağanak", r:80, d:4},
-  {n:"Abartılı (görsel)", r:100, d:2},
-  {n:"Uç değer", r:150, d:1},
+  {n:"Sağanak", r:40, d:2},
+  {n:"Aşırı sağanak", r:60, d:2},
+  // İkitelli'de 1 saatte 90 mm, 4 saatte ~181 mm (MGM: aynı gün Çatalca 84 mm/sa) — İstanbul'da ölçülmüş en sert yağışlardan
+  {n:"2009 Ayamama seli", r:90, d:2, t:"9 Eylül 2009 · İkitelli'de saatte ~90 mm, 4 saatte ~180 mm"},
+  // aşağıdakiler gizli bölümde: İstanbul'da hiç görülmemiş ya da Türkiye rekoru düzeyinde
+  {n:"Türkiye günlük rekoru", r:40, d:12, x:1, t:"Kemer-Ovacık, 17 Aralık 2018 · 24 saatte 490,8 mm (burada 12 saatte ~480 mm)"},
+  {n:"Hopa 1988 şiddeti", r:180, d:0.5, x:1, t:"Hopa, 7 Temmuz 1988 · 30 dakikada 90,9 mm (saatte 180 mm hızla)"},
+  {n:"Abartılı (görsel)", r:150, d:2, x:1, t:"Gerçekte görülmez; suyun nereye gittiğini abartarak göstermek için"},
 ];
 // rate: ızgaraların yüzeyden alabildiği su (mm/sa), store: boru hacmi (mm, alan geneli), out: arıtma/denize deşarj (mm/sa)
 const SEWERS = {
@@ -530,7 +540,7 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:100, durH:2, inf:8, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:90, durH:2, inf:8, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -674,12 +684,19 @@ $("goBtn").onclick=()=>{
 };
 
 // ================= Kontroller =================
+// aşırı senaryolar (Türkiye rekorları, abartılı görsel) "⚠ Aşırı senaryolar" düğmesinin altında gizli durur
+const scenX=document.createElement("div"); scenX.id="scenX"; scenX.className="chips"; scenX.hidden=true;
+scenX.innerHTML=`<div class="scenXn">İstanbul'da şimdiye kadar ölçülmemiş yağışlar: Türkiye rekorları ve görsel abartı.</div>`;
+const scenXb=document.createElement("button"); scenXb.className="chip scenXb"; scenXb.textContent="⚠ Aşırı senaryolar ▾";
+scenXb.onclick=()=>{ scenX.hidden=!scenX.hidden; scenXb.textContent=`⚠ Aşırı senaryolar ${scenX.hidden?"▾":"▴"}`; };
 SCEN.forEach(s=>{
-  const c=document.createElement("button"); c.className="chip"; c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
-  if(s.n==="Abartılı (görsel)") c.classList.add("on"); // varsayılan senaryo
-  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; uiUpd(); document.querySelectorAll("#scen .chip").forEach(x=>x.classList.toggle("on",x===c)); };
-  $("scen").appendChild(c);
+  const c=document.createElement("button"); c.className="chip"+(s.x?" xs":""); c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
+  if(s.t) c.title=s.t;
+  if(s.n==="2009 Ayamama seli") c.classList.add("on"); // varsayılan senaryo
+  c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; uiUpd(); document.querySelectorAll("#scen .chip:not(.scenXb)").forEach(x=>x.classList.toggle("on",x===c)); };
+  (s.x?scenX:$("scen")).appendChild(c);
 });
+$("scen").append(scenXb, scenX);
 function uiUpd(){
   S.rate=+$("rate").value; S.durH=+$("dur").value; S.inf=+$("soil").value;
   const sp=SPEEDS[+$("spd").value]; S.speed=sp.v;
@@ -2531,7 +2548,7 @@ async function mmSearch(){
 }
 addEventListener("keydown",e=>{ if(e.key==="Escape" && MM.on && $("picker").hidden && document.activeElement!==$("mmQ")) $("mmBack").click(); });
 
-// İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, Abartılı görsel) yüklenir ve yağmur kendiliğinden başlar
+// İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, 2009 Ayamama yağışı) yüklenir ve yağmur kendiliğinden başlar
 loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 </script>
 <script>

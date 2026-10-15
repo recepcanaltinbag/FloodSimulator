@@ -21,8 +21,7 @@
     #catchBox .sum small{font-weight:500;color:var(--muted)}
     #catchBox .more[hidden]{display:none}
     #catchBox.compact{padding:8px 12px}
-    #catchBox.at{transform:none}
-    #catchBox .zoom{border:1px solid var(--line);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer;margin-top:6px}`;
+    #catchBox.at{transform:none}`;
   document.head.appendChild(css);
   const box = document.createElement("div"); box.id = "catchBox"; box.hidden = true;
   (document.getElementById("view") || document.body).appendChild(box);
@@ -89,7 +88,6 @@
     box.innerHTML = `<button class="x" title="Kapat">✕</button>
       <div class="sum">💧 ${fmtA(A)}${Aext>0?` <small>(dışarıdan +${fmtA(Aext)})</small>`:""} · ~${fmt(tc)} dk · <span style="color:var(--accent)">${S.rate} mm/sa'te ${fmt(Qnow, Qnow<10?2:0)} m³/sn</span>
         <small>${CA.open?"▴ gizle":"▾ ayrıntı"}</small></div>
-      <button class="zoom" title="Kamerayı havzanın tamamına uçur">🔍 Havzayı göster</button>
       <div class="more" ${CA.open?"":"hidden"}>
       <div style="font-weight:700;font-size:14px;margin-top:6px">Drenaj alanı</div>
       <div class="muted">${p?`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · `:""}çıkış noktası ${fmt(H[pour])} m</div>
@@ -108,11 +106,9 @@
         Kanalizasyon ve zemin emmesi C katsayısıyla kabaca temsil edilir. Gösterim amaçlıdır.</div>
       </div>`;
     box.querySelector(".x").onclick = hide;
-    box.querySelector(".zoom").onclick = () => fitCamera(CA.fitList, CA.wider);
     box.querySelector(".sum").onclick = () => { CA.open = !CA.open; box.classList.toggle("compact", !CA.open);
       box.querySelector(".more").hidden = !CA.open; box.querySelector(".sum small").textContent = CA.open ? "▴ gizle" : "▾ ayrıntı"; if(CA.pos) place(CA.pos); };
     box.hidden = false;
-    CA.fitList = U.list.concat(inflows.map(q => q.i)); CA.wider = Aext > 0;
     place(pos);
     drawDereOverlay();
   }
@@ -127,18 +123,6 @@
     if(y + h > vr.height - 8) y = Math.max(8, vr.height - h - 8);
     box.style.left = Math.max(8, x) + "px"; box.style.top = Math.max(8, y) + "px";
     CA.pos = pos;
-  }
-
-  // kamerayı havzanın tamamı görünecek şekilde yumuşakça uçur (üstteki özet panel için biraz aşağı kaydırarak)
-  function fitCamera(list, wider){
-    if(typeof setView !== "function" || typeof controls === "undefined") return;
-    let x0=N, x1=0, y0=N, y1=0; for(const i of list){ const x=i%N, y=(i-x)/N; if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
-    const toW = v => (v/(N-1) - .5)*SIZE, H0 = (window.BURN&&BURN.visual&&BURN.visual.length===b.length) ? BURN.visual : b;
-    const cx = toW((x0+x1)/2), cz = toW((y0+y1)/2), ext = Math.max(toW(x1)-toW(x0), toW(y1)-toW(y0), 6);
-    const ci = Math.round((y0+y1)/2)*N + Math.round((x0+x1)/2), cy = Math.max(0, H0[ci]||0)*sc()*S.ex;
-    const fov = (camera.fov||45)*Math.PI/180, dist = Math.min(controls.maxDistance||500, Math.max(12, ext*(wider?1.0:0.75)/Math.tan(fov/2)));
-    const polar = Math.min(Math.max(controls.getPolarAngle(), 0.55), 0.95);
-    setView(polar, controls.getAzimuthalAngle(), dist, new THREE.Vector3(cx, cy, cz));
   }
 
   function hide(){ box.hidden = true; CA.cells = null; CA.pour = -1; drawDereOverlay(); }
