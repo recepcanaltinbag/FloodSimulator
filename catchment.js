@@ -64,7 +64,13 @@
     for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){ if(dx*dx+dy*dy>16) continue; const xx=x+dx, yy=y+dy; if(xx<0||yy<0||xx>=N||yy>=N) continue; const j=yy*N+xx; if(!sea[j] && LC.acc[j] > LC.acc[pour]) pour = j; }
     if(sea[pour]){ alert("Deniz üzerinde drenaj alanı hesaplanmaz."); return; }
     const U = upstream(pour), H = (window.BURN && BURN.vis && BURN.vis.length===b.length) ? BURN.vis : b;
-    const A = U.count*S.cell*S.cell, Akm2 = A/1e6;
+    const Ain = U.count*S.cell*S.cell;
+    // pencere dışındaki yukarı havza: kenardan bu havzaya giren girişlerin alanı (havza girişi analizi, ~115 m)
+    let Aext = 0, nIn = 0;
+    if(typeof UP !== "undefined" && UP.on && UP.R && UP.R.cls)
+      for(const q of UP.R.cls){ if(q && q.cells && q.cells.some(c => U.inC[c])){ Aext += q.area; nIn++; } }
+    const A = Ain + Aext, Akm2 = A/1e6;
+    const fmtA = a => a<1e6 ? fmt(a/1e4,1)+" ha" : fmt(a/1e6,2)+" km²";
     const drop = Math.max(0.5, H[U.far] - H[pour]), slope = Math.max(0.002, drop/Math.max(U.L, S.cell));
     const tc = 0.0195 * Math.pow(Math.max(U.L, S.cell), 0.77) * Math.pow(slope, -0.385);   // dk (Kirpich)
     let edge = false; for(const i of U.list){ const ix=i%N, iy=Math.floor(i/N); if(!ix||!iy||ix===N-1||iy===N-1){ edge = true; break; } }
@@ -76,13 +82,14 @@
     const Qnow = C.c*S.rate*Akm2/3.6;
     box.className = CA.open ? "" : "compact";
     box.innerHTML = `<button class="x" title="Kapat">✕</button>
-      <div class="sum">💧 ${Akm2<1?fmt(A/1e4,1)+" ha":fmt(Akm2,2)+" km²"} · ~${fmt(tc)} dk · <span style="color:var(--accent)">${S.rate} mm/sa'te ${fmt(Qnow, Qnow<10?2:0)} m³/sn</span>
+      <div class="sum">💧 ${fmtA(A)}${Aext>0?` <small>(dışarıdan +${fmtA(Aext)})</small>`:""} · ~${fmt(tc)} dk · <span style="color:var(--accent)">${S.rate} mm/sa'te ${fmt(Qnow, Qnow<10?2:0)} m³/sn</span>
         <small>${CA.open?"▴ gizle":"▾ ayrıntı"}</small></div>
       <div class="more" ${CA.open?"":"hidden"}>
       <div style="font-weight:700;font-size:14px;margin-top:6px">Drenaj alanı</div>
       <div class="muted">${p?`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · `:""}çıkış noktası ${fmt(H[pour])} m</div>
       <div class="kv">
-        <span>Drenaj alanı</span><b>${Akm2<1?fmt(A/1e4,1)+" ha":fmt(Akm2,2)+" km²"}</b>
+        <span>Drenaj alanı</span><b>${fmtA(A)}</b>
+        ${Aext>0?`<span class="muted">· pencere içi / dışarıdan</span><b class="muted" style="font-weight:500">${fmtA(Ain)} + ${fmtA(Aext)}</b>`:""}
         <span>En uzun akış yolu</span><b>${fmt(U.L/1000,2)} km</b>
         <span>Ortalama eğim</span><b>%${fmt(slope*100,1)}</b>
         <span>Toplanma süresi (Kirpich)</span><b>~${fmt(tc)} dk</b>
@@ -90,7 +97,8 @@
       </div>
       <table><tr><th>Yağış</th><th>Tepe debi</th><th>1 saatte gelen su</th></tr>${rows}</table>
       <div class="muted" style="margin-top:6px;font-size:11px">Rasyonel Yöntem (Q = C·i·A/3,6): yağış, toplanma süresinden (~${fmt(tc)} dk) uzun sürerse tepe debiye ulaşılır.
-        ${Akm2>5?"<b>Bu havza büyük; Rasyonel Yöntem debiyi abartabilir.</b> ":""}${edge?"<b>Havza simülasyon alanının dışına taşıyor; dışarıdaki kısım sayılmadı</b> (alanı kaydırırsan büyüyebilir). ":""}
+        ${Akm2>5?"<b>Bu havza büyük; Rasyonel Yöntem debiyi abartabilir.</b> ":""}${Aext>0?`Pencere dışındaki ${nIn} girişten gelen ${fmtA(Aext)} yukarı havza alana eklendi (kaba ~115 m analiz); toplanma süresi yalnızca pencere içinden hesaplandı, gerçekte daha uzun olabilir. `:
+          edge?"<b>Havza simülasyon alanının dışına taşıyor; dışarıdaki kısım sayılmadı</b> (Havzadan gelen su kapalı ya da henüz hesaplanmadı). ":""}
         Kanalizasyon ve zemin emmesi C katsayısıyla kabaca temsil edilir. Gösterim amaçlıdır.</div>
       </div>`;
     box.querySelector(".x").onclick = hide;
