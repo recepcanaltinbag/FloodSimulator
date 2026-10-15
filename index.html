@@ -351,11 +351,11 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="chips" id="scen" style="margin-bottom:10px"></div>
   <div class="ctrl">
     <label>Yağış şiddeti <span id="rateV"></span></label>
-    <input type="range" id="rate" min="5" max="200" step="5" value="90">
+    <input type="range" id="rate" min="5" max="200" step="5" value="45">
   </div>
   <div class="ctrl">
     <label>Yağış süresi <span id="durV"></span></label>
-    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="2">
+    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="4">
   </div>
   <div class="ctrl">
     <label>Zemin (suyu emme)</label>
@@ -367,18 +367,6 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <option value="0">Hiç emmesin (en kötü durum)</option>
     </select>
   </div>
-  <div class="ctrl">
-    <label style="justify-content:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="karstOn"> 🕳️ Karst modu <span class="muted" style="font-weight:400">(kireçtaşı + düdenler)</span></label>
-    <p class="sub" id="karstInfo" style="margin-top:4px" hidden></p>
-    <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:8px"><input type="checkbox" id="depSink"> 🕳️ Kapalı çukurlar yeraltına boşalsın</label>
-    <p class="sub" id="depInfo" style="margin-top:4px"></p>
-    <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:10px"><input type="checkbox" id="upOn" checked> 🏞️ Havzadan gelen su <span class="muted" style="font-weight:400">(yukarı havza)</span></label>
-    <p class="sub" id="upInfo" style="margin-top:4px"></p>
-    <p class="sub" style="margin-top:4px;font-size:11px">Simülasyon alanının dışında kalan yukarı havzaya düşen yağmurun zemin ve kanalizasyon ayarlarına göre kalan kısmı, dere yataklarından gecikmeli olarak alanın kenarından girer. Kaba yükseklik verisi (~115 m hücre) ve D8 akış yönleriyle hesaplanır; hız yamaçta ~0,5, derede ~1,5 m/s varsayılır. Dışarıdaki kapalı çukurlar (baraj gölü, maden çukuru ya da kaba veride yol dolgusu olabilir) normalde dolu sayılır ve suyu geçirir; karst modunda ya da “Kapalı çukurlar yeraltına boşalsın” açıkken dolana kadar suyu tutar ve her biri en çok 5 m³/s yutar. Dere ıslahı ve kanallar hesaba katılmaz.</p>
-    <p class="sub" style="margin-top:4px;font-size:11px">Kapalı çukur analizi: dolgu derinliği ≥ 2 m ve ≥ 5 hücrelik çukurlar OSM göl/baraj verisiyle karşılaştırılır; göl yoksa en alçak hücre yutak olur (5 m³/s). Topografya + OSM çıkarımıdır, jeoloji haritası değildir; DEM hataları yanlış işaret üretebilir.</p>
-    <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken zemin “Karstik kireçtaşı” (80 mm/sa) olur ve her düden en çok 5 m³/s su yutar.</p>
-  </div>
-
   <h2>Kanalizasyon / yağmur suyu sistemi</h2>
   <div class="ctrl">
     <select id="sewer">
@@ -393,6 +381,20 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <label>Izgara / boru tıkanıklığı <span id="blkV"></span></label>
     <input type="range" id="blk" min="0" max="90" step="5" value="20">
   </div>
+  <h2>Havza ve karst</h2>
+  <div class="ctrl">
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="karstOn"> 🕳️ Karst modu <span class="muted" style="font-weight:400">(kireçtaşı + düdenler)</span></label>
+    <p class="sub" id="karstInfo" style="margin-top:4px" hidden></p>
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:8px"><input type="checkbox" id="depSink"> 🕳️ Kapalı çukurlar yeraltına boşalsın</label>
+    <p class="sub" id="depInfo" style="margin-top:4px"></p>
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:10px"><input type="checkbox" id="upOn" checked> 🏞️ Havzadan gelen su <span class="muted" style="font-weight:400">(yukarı havza)</span></label>
+    <p class="sub" id="upInfo" style="margin-top:4px"></p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Simülasyon alanının dışında kalan yukarı havzaya düşen yağmurun zemin ve kanalizasyon ayarlarına göre kalan kısmı, dere yataklarından gecikmeli olarak alanın kenarından girer. Kaba yükseklik verisi (~115 m hücre) ve D8 akış yönleriyle hesaplanır; hız yamaçta ~0,5, derede ~1,5 m/s varsayılır. Dışarıdaki kapalı çukurlar (baraj gölü, maden çukuru ya da kaba veride yol dolgusu olabilir) normalde dolu sayılır ve suyu geçirir; karst modunda ya da “Kapalı çukurlar yeraltına boşalsın” açıkken dolana kadar suyu tutar ve her biri en çok 5 m³/s yutar. Dere ıslahı ve kanallar hesaba katılmaz.</p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Kapalı çukur analizi: dolgu derinliği ≥ 2 m ve ≥ 5 hücrelik çukurlar OSM göl/baraj verisiyle karşılaştırılır; göl yoksa en alçak hücre yutak olur (5 m³/s). Topografya + OSM çıkarımıdır, jeoloji haritası değildir; DEM hataları yanlış işaret üretebilir.</p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken zemin “Karstik kireçtaşı” (80 mm/sa) olur ve her düden en çok 5 m³/s su yutar.</p>
+  </div>
+
+  <h2>Simülasyon</h2>
   <div class="ctrl">
     <label>Simülasyon hızı <span id="spdV"></span></label>
     <input type="range" id="spd" min="0" max="3" step="1" value="3">
@@ -516,12 +518,15 @@ const SCEN = [
   {n:"Kuvvetli yağış", r:20, d:1},
   {n:"Sağanak", r:40, d:2},
   {n:"Aşırı sağanak", r:60, d:2},
-  // İkitelli'de 1 saatte 90 mm, 4 saatte ~181 mm (MGM: aynı gün Çatalca 84 mm/sa) — İstanbul'da ölçülmüş en sert yağışlardan
-  {n:"2009 Ayamama seli", r:90, d:2, t:"9 Eylül 2009 · İkitelli'de saatte ~90 mm, 4 saatte ~180 mm"},
+  // İkitelli'de en sert saatte 90 mm, 4 saatte ~181 mm (MGM: aynı gün Çatalca 84 mm/sa) — İstanbul'da ölçülmüş en sert yağışlardan
+  {n:"2009 Ayamama seli", r:45, d:4, t:"9 Eylül 2009 · İkitelli'de 4 saatte ~181 mm (burada saatte 45 mm sabit; en sert saatte ~90 mm düştü)"},
+  // 13–14 Ekim 2026: Beykoz'da ~24 saatte 242–277 mm (AKOM), 1942'den beri en yüksek günlük değer; saatlik tepe değeri yayımlanmadı,
+  // burada ortalama şiddetle 12 saatte 240 mm
+  {n:"14 Ekim 2026", r:20, d:12, t:"14 Ekim 2026 · Beykoz'da ~24 saatte 242–277 mm (AKOM). Burada 12 saat boyunca saatte 20 mm (toplam 240 mm); gerçekte bazı saatler daha sertti"},
   // aşağıdakiler gizli bölümde: İstanbul'da hiç görülmemiş ya da Türkiye rekoru düzeyinde
   // iklim değişikliği: ısınan hava ~%7/°C daha fazla nem taşır, kısa süreli sağanaklarda artış daha da yüksek olabilir;
   // +2–3 °C ısınmada 2009 Ayamama yağışının ~%30 daha şiddetlisi
-  {n:"İklim değişikliğiyle 2009", r:115, d:2, x:1, t:"2009 Ayamama yağışı, 2–3 °C daha sıcak bir iklimde (~%30 daha şiddetli): saatte ~115 mm"},
+  {n:"İklim değişikliğiyle 2009", r:60, d:4, x:1, t:"2009 Ayamama yağışı, 2–3 °C daha sıcak bir iklimde (~%30 daha şiddetli): 4 saatte ~240 mm"},
   {n:"Türkiye günlük rekoru", r:40, d:12, x:1, t:"Kemer-Ovacık, 17 Aralık 2018 · 24 saatte 490,8 mm (burada 12 saatte ~480 mm)"},
   {n:"Hopa 1988 şiddeti", r:180, d:0.5, x:1, t:"Hopa, 7 Temmuz 1988 · 30 dakikada 90,9 mm (saatte 180 mm hızla)"},
   {n:"Abartılı (görsel)", r:150, d:2, x:1, t:"Gerçekte görülmez; suyun nereye gittiğini abartarak göstermek için"},
@@ -543,7 +548,7 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:90, durH:2, inf:8, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:45, durH:4, inf:8, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];

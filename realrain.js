@@ -66,7 +66,14 @@ if(document.readyState === "loading"){
   const chipP = document.createElement("button"); chipP.className = "chip"; chipP.id = "rrChip";
   const chipF = document.createElement("button"); chipF.className = "chip"; chipF.id = "fcChip";
   // "Dün akşam" senaryosu arayüzden kaldırıldı (kod duruyor; chipP sayfaya eklenmiyor). Yalnızca tahmin çipi gösterilir.
-  scen.prepend(chipF);
+  // Tahmin çipi, aşırı senaryolar gibi, senaryoların altında açılır "🔮 Tahmin" bölümünde durur
+  const fcSec = document.createElement("div"); fcSec.id = "scenF"; fcSec.className = "chips"; fcSec.hidden = true;
+  fcSec.innerHTML = `<div class="scenXn">Open-Meteo'nun önümüzdeki 3 güne ait saatlik yağış tahmini, seçili bölge için.</div>`;
+  fcSec.appendChild(chipF);
+  const fcBtn = document.createElement("button"); fcBtn.className = "chip scenXb scenFb"; fcBtn.textContent = "🔮 Tahmin ▾";
+  const fcOpen = o => { fcSec.hidden = !o; fcBtn.textContent = `🔮 Tahmin ${o?"▴":"▾"}`; };
+  fcBtn.onclick = () => fcOpen(fcSec.hidden);
+  scen.insertBefore(fcBtn, scen.querySelector(".scenXb")); fcBtn.after(fcSec);
 
   const box = document.createElement("div");
   box.id = "rrBox";
@@ -88,6 +95,9 @@ if(document.readyState === "loading"){
     .rr-bars i small{position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);font-size:9.5px;color:var(--muted);font-style:normal}
     .rr-f{margin-top:18px;color:var(--muted);font-size:11px}
     #fcChip:disabled{opacity:.5;cursor:default}
+    #scenF{flex-basis:100%;padding:6px 8px;border:1px dashed rgba(78,168,255,.45);border-radius:10px;background:rgba(78,168,255,.06)}
+    #scenF[hidden]{display:none}
+    .chip.scenFb{border-style:dashed;color:#9ccfff;border-color:rgba(78,168,255,.45)}
     .rr-bars i u{position:absolute;left:-1px;right:-1px;bottom:0;background:rgba(255,176,32,.18);border:1px dashed rgba(255,176,32,.45);border-bottom:0;border-radius:3px 3px 0 0;text-decoration:none;z-index:-1}
     .rr-bars{isolation:isolate}
     .rr-var{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:20px;background:var(--bg);padding:3px;border-radius:8px}
@@ -105,6 +115,7 @@ if(document.readyState === "loading"){
     else { chipF.textContent = `🔮 Tahmin · ${trDate(FC.date)} ${hh(FC.start)}:00${FC.totals?` · ${fmt(FC.totals.p10,0)}–${fmt(FC.totals.p90,0)} mm`:""}`; chipF.disabled = false; chipF.title = ""; }
     chipP.classList.toggle("on", RR.on && RR.mode==="past");
     chipF.classList.toggle("on", RR.on && RR.mode==="fc");
+    if(RR.on && RR.mode==="fc" && fcSec.hidden) fcOpen(true);
     box.hidden = !RR.on;
     if(!RR.on) return;
     const end = RR.start + RR.mm.length;
