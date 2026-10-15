@@ -14,7 +14,7 @@
   // priority-flood ile çukurları doldur, D8 akış yönü ve birikimi hesapla
   function analyse(){
     if(!b || !REG || !DERE) return;
-    const n=N*N, h = (window.BURN && BURN.vis && BURN.vis.length===n) ? BURN.vis : b;   // özgün yüzey (köprü kesikleri etkilemesin)
+    const n=N*N, h = b;   // dereleri işlenmiş arazi (burn.js): köprü setleri akışı kesmesin, ana hat OSM deresiyle hizalansın
     const F=new Float32Array(n), done=new Uint8Array(n), ord=new Int32Array(n), par=new Int32Array(n).fill(-1);
     const hk=new Float32Array(n), hi=new Int32Array(n); let hs=0, no=0;
     const push=(i,v)=>{ let c=hs++; while(c>0){ const p=(c-1)>>1; if(hk[p]<=v) break; hk[c]=hk[p]; hi[c]=hi[p]; c=p; } hk[c]=v; hi[c]=i; };

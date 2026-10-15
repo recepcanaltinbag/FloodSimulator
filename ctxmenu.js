@@ -32,7 +32,7 @@
     const h = hit.point.y / (sc()*S.ex);
     const x = Math.round(gx), y = Math.round(gy), inside = x>=0 && y>=0 && x<N && y<N, i = y*N + x;
     const w = inside && d && !sea[i] ? d[i] : null;
-    return {lat: ll.lat, lon: ll.lon, h, w};
+    return {lat: ll.lat, lon: ll.lon, h, w, gx, gy};
   }
 
   const f5 = v => v.toFixed(5);
@@ -49,11 +49,13 @@
     menu.innerHTML = `<div class="hd">${ll} · ${fmt(p.h)} m${wtxt}</div>
       <button data-a="ll">📋 Koordinatı kopyala</button>
       <button data-a="full">📋 Koordinat + yükseklik${p.w!=null?" + su":""}</button>
-      <button data-a="gm">🗺️ Google Haritalar'da aç</button>`;
+      <button data-a="gm">🗺️ Google Haritalar'da aç</button>
+      <button data-a="catch">💧 Buranın drenaj alanı ve olası su miktarı</button>`;
     menu.onclick = e => {
       const a = e.target.closest("button")?.dataset.a; if(!a) return;
       if(a === "ll") copy(ll, "Koordinat kopyalandı");
       if(a === "full") copy(`${ll}, ${p.h.toFixed(1)} m${p.w!=null?`, su ${p.w.toFixed(2)} m`:""}`, "Koordinat ve yükseklik kopyalandı");
+      if(a === "catch" && window.CATCH) CATCH.show(p.gx, p.gy);
       if(a === "gm") window.open(`https://www.google.com/maps?q=${f5(p.lat)},${f5(p.lon)}`, "_blank", "noopener");
       menu.hidden = true;
     };
