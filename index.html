@@ -520,9 +520,10 @@ const SCEN = [
   {n:"Aşırı sağanak", r:60, d:2},
   // İkitelli'de en sert saatte 90 mm, 4 saatte ~181 mm (MGM: aynı gün Çatalca 84 mm/sa) — İstanbul'da ölçülmüş en sert yağışlardan
   {n:"2009 Ayamama seli", r:45, d:4, t:"9 Eylül 2009 · İkitelli'de 4 saatte ~181 mm (burada saatte 45 mm sabit; en sert saatte ~90 mm düştü)"},
-  // 13–14 Ekim 2026: Beykoz'da ~24 saatte 242–277 mm (AKOM), 1942'den beri en yüksek günlük değer; saatlik tepe değeri yayımlanmadı,
-  // burada ortalama şiddetle 12 saatte 240 mm
-  {n:"14 Ekim 2026", r:20, d:12, t:"14 Ekim 2026 · Beykoz'da ~24 saatte 242–277 mm (AKOM). Burada 12 saat boyunca saatte 20 mm (toplam 240 mm); gerçekte bazı saatler daha sertti"},
+  // 14 Ekim 2026: Beykoz'da ~24 saatte 242–277 mm (AKOM), 1942'den beri en yüksek günlük değer. Saatlik ölçüm yayımlanmadı;
+  // Open-Meteo saatlik model eğrisinde en sert saatler 18:00–21:00 (model 24 saatte 80 mm, AKOM 22:22'de 225,8 mm → ×2,8 ölçekle)
+  // bu üç saat ~124 mm, en sert saat ~57 mm. Burada o üç saat: 40 mm/sa · 3 sa
+  {n:"14 Ekim 2026 · en sert 3 saat", r:40, d:3, t:"14 Ekim 2026 akşamı Beykoz, 18:00–21:00 · yaklaşık 120 mm (en sert saatte ~55 mm). Günün tamamında 242–277 mm düştü (AKOM). Saatlik değerler model eğrisinin ölçümle ölçeklenmesinden tahmindir"},
   // aşağıdakiler gizli bölümde: İstanbul'da hiç görülmemiş ya da Türkiye rekoru düzeyinde
   // iklim değişikliği: ısınan hava ~%7/°C daha fazla nem taşır, kısa süreli sağanaklarda artış daha da yüksek olabilir;
   // +2–3 °C ısınmada 2009 Ayamama yağışının ~%30 daha şiddetlisi
