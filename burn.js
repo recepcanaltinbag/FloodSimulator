@@ -6,7 +6,9 @@
 (function(){
   if(typeof loadDere !== "function") return;
   const MAX_CUT = 30;     // m: bundan derin kesik gerekiyorsa veri uyumsuzluğu sayılır, kesilmez
-  const BURN = window.BURN = {on:true, vis:null, reg:null, cells:0, maxCut:0, lines:0};
+  const DECK = 3;         // m: bundan büyük kesik köprü/viyadük tablası sayılır; görüntüde tabla kalır
+  const BANK = 0.4;       // m: yanlara indirilen hücreler oluk tabanının bu kadar üstünde kalır
+  const BURN = window.BURN = {on:true, vis:null, visual:null, reg:null, cells:0, maxCut:0, lines:0};
 
   // polyline (ızgara koordinatı) → 4-komşu bağlantılı hücre dizisi
   function rasterize(pts){
@@ -46,6 +48,15 @@
       const cut=h-m;
       if(cut>MAX_CUT){ m=h; continue; }   // uyumsuz veri: profili buradan yeniden başlat
       b[i]=m; BURN.cells++; if(cut>BURN.maxCut) BURN.maxCut=cut;
+      // oluğu genişlet: köprü/viyadük altında vadi tabanı geniştir; tek hücrelik dar oluk suyu sıkıştırır
+      const r = cut > DECK ? 2 : 1, x=i%N, y=(i-x)/N;
+      for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
+        if(!dx && !dy) continue;
+        const xx=x+dx, yy=y+dy; if(xx<0||yy<0||xx>=N||yy>=N) continue;
+        const j=yy*N+xx; if(sea[j]) continue;
+        const floor = m + BANK*Math.max(Math.abs(dx),Math.abs(dy));
+        if(b[j] > floor && b[j]-floor <= MAX_CUT) b[j] = floor;
+      }
     }
     BURN.lines++;
   }
@@ -60,8 +71,12 @@
       if(!w.pts || w.pts.length<2) continue;
       burnLine(rasterize(w.pts.map(p=>p.g)));
     }
+    // görüntü: düzeltilmiş arazi; yalnızca büyük kesiklerde (köprü/viyadük tablası) özgün yükseklik kalır
+    const vis = BURN.vis, V = BURN.visual = new Float32Array(b.length);
+    for(let i=0;i<b.length;i++) V[i] = vis[i]-b[i] > DECK ? vis[i] : b[i];
     if(typeof karstPrep==="function"){ try{ karstPrep(); }catch(e){ console.warn("karstPrep", e); } }
-    if(typeof updateWaterMesh==="function") updateWaterMesh();
+    if(typeof rebuildTerrainZ==="function" && typeof terrainMesh!=="undefined" && terrainMesh){ try{ rebuildTerrainZ(); }catch(e){ console.warn("rebuildTerrainZ", e); } }
+    else if(typeof updateWaterMesh==="function") updateWaterMesh();
   }
   BURN.burn = burn;
 
@@ -73,12 +88,13 @@
     return r;
   };
 
-  // 3B arazi görüntüsü özgün yükseklikleri kullansın (köprü görünür kalsın)
+  // 3B arazi görüntüsü: düzeltilmiş arazi, ama köprü/viyadük tablaları özgün yükseklikte (görünür kalsın)
   if(typeof rebuildTerrainZ === "function"){
     const origRebuild = rebuildTerrainZ;
     rebuildTerrainZ = function(){
-      if(BURN.vis && BURN.reg === REG && BURN.vis.length === b.length){
-        const keep = b; b = BURN.vis;
+      const V = BURN.on ? BURN.visual : BURN.vis;
+      if(V && BURN.reg === REG && V.length === b.length){
+        const keep = b; b = V;
         try{ return origRebuild.apply(this, arguments); } finally { b = keep; }
       }
       return origRebuild.apply(this, arguments);
@@ -96,7 +112,7 @@
     document.getElementById("burnOn").onchange = e => {
       BURN.on = e.target.checked;
       if(!BURN.vis || BURN.reg !== REG) return;
-      if(BURN.on) burn(); else { b.set(BURN.vis); if(typeof karstPrep==="function") karstPrep(); }
+      if(BURN.on) burn(); else { b.set(BURN.vis); if(typeof karstPrep==="function") karstPrep(); if(typeof rebuildTerrainZ==="function") rebuildTerrainZ(); }
     };
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", addToggle); else addToggle();
