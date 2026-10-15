@@ -973,7 +973,7 @@ function simStep(dt){
       if(sea[i]||d[i]<=0||(O&&O[i])){fL[i]=fR[i]=fT[i]=fB[i]=0;continue;}
       const h=H[i];
       // Manning sürtünmesi (örtük): v = Q/(l·h), sürtünme ∝ g n² v / h^(4/3)
-      const dep=d[i]>0.005?d[i]:0.005, fc=MN/(dep*Math.pow(dep,4/3));
+      const dep=d[i]>0.005?d[i]:0.005, fc=MN/(dep*dep*Math.cbrt(dep)); // h·h^(4/3) = h²·∛h (pow'dan hızlı)
       const hl= x>0?H[i-1]:b[i], hr= x<N-1?H[i+1]:b[i], ht= y>0?H[i-N]:b[i], hb= y<N-1?H[i+N]:b[i];
       let a=fL[i]/(1+fc*fL[i])+C*(h-hl); a=a>0?a:0;
       let r=fR[i]/(1+fc*fR[i])+C*(h-hr); r=r>0?r:0;
@@ -1535,10 +1535,11 @@ let last=performance.now(), statAcc=0, bldAcc=0;
 function loop(now){
   const rdt=Math.min(0.1,(now-last)/1000); last=now;
   if(S.running && S.loaded){
-    const DT=0.35*Math.sqrt(S.cell/G);
+    const DT=0.6*Math.sqrt(S.cell/G); // ~1 sn; 1,2 sn'de de kararlı test edildi
     const target=S.speed*60*rdt, t0=performance.now();
     let done=0;
-    while(done<target && performance.now()-t0<20){ simStep(DT); done+=DT; }
+    const budget = S.speed>=60 ? 48 : 30; // "maksimum": hesaba kare başına daha çok süre (~18 kare/sn)
+    while(done<target && performance.now()-t0<budget){ simStep(DT); done+=DT; }
     updateWaterMesh();
     statAcc+=rdt; if(statAcc>0.4){ statAcc=0; updStats(); drawDereOverlay(); }
   }
