@@ -44,6 +44,29 @@ dd{margin:2px 0 0;color:#c9d4de}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px;padding:24px 0 40px;margin-top:30px}
 .svgt{fill:var(--ink);font:16px system-ui,sans-serif}
 .svgm{fill:var(--muted);font:15px system-ui,sans-serif}
+/* Terimler: mini animasyonlar */
+.terms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.term{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.term h3{margin:0 0 6px;font-size:16px}
+.term svg{display:block;width:100%;height:auto;background:#0f141b;border-radius:8px;margin-bottom:8px}
+.term p{font-size:14.5px;margin:0;color:#c9d4de}
+.term .t{fill:var(--ink);font:13px system-ui,sans-serif}.term .m{fill:var(--muted);font:12px system-ui,sans-serif}
+@keyframes fall{0%{transform:translateY(-30px);opacity:0}15%{opacity:1}100%{transform:translateY(60px);opacity:0}}
+@keyframes fillY{0%,8%{transform:scaleY(0)}80%,100%{transform:scaleY(1)}}
+@keyframes soak{0%,10%{transform:scaleY(.02)}45%{transform:scaleY(.6)}90%,100%{transform:scaleY(.8)}}
+@keyframes slide{0%{transform:translate(0,0);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translate(170px,60px);opacity:0}}
+@keyframes pass{0%{transform:translateX(-60px)}100%{transform:translateX(300px)}}
+@keyframes tick{0%,100%{opacity:.35}50%{opacity:1}}
+@keyframes path1{0%{offset-distance:0%;opacity:0}10%{opacity:1}90%{opacity:1}100%{offset-distance:100%;opacity:0}}
+.an-fall{animation:fall 1.1s linear infinite}
+.an-fill{transform-box:fill-box;transform-origin:bottom;animation:fillY 5s ease-in-out infinite}
+.an-soak{transform-box:fill-box;transform-origin:top;animation:soak 6s ease-out infinite}
+.an-slide{animation:slide 3s linear infinite}
+.an-pass{animation:pass 4s linear infinite}
+.an-tick{animation:tick 1s ease-in-out infinite}
+.an-path{offset-rotate:0deg;animation:path1 3.2s linear infinite}
+@media (prefers-reduced-motion:reduce){.terms *{animation:none!important}.an-fill,.an-soak{transform:none}}
+@media (max-width:600px){.terms{grid-template-columns:1fr}}
 @media (max-width:600px){h1{font-size:25px}.wrap{padding:0 16px}body{font-size:15.5px}header b{font-size:15px}.back{padding:6px 11px;font-size:13px}.back .l{display:none}}
 </style>
 </head>
@@ -55,7 +78,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px;paddin
 <p class="lead">Ekranda gördüğün su, birkaç basit fikrin birleşmesinden çıkıyor: yağmur düşer, bir kısmını toprak emer, bir kısmını kanalizasyon alır, kalanı yokuş aşağı akar ve çukurlarda toplanır. Bu sayfa bu adımları tek tek anlatıyor.</p>
 
 <nav class="toc">
-  <a href="#yagis">Yağış</a><a href="#zemin">Zemin emişi</a><a href="#kanal">Kanalizasyon</a><a href="#akis">Yüzey akışı</a>
+  <a href="#terimler">Terimler</a><a href="#yagis">Yağış</a><a href="#zemin">Zemin emişi</a><a href="#kanal">Kanalizasyon</a><a href="#akis">Yüzey akışı</a>
   <a href="#dere">Dereler ve havza</a><a href="#cukur">Çukurlar ve karst</a><a href="#arazi">Yükseklik verisi</a>
   <a href="#ekran">Ekranda ne var?</a><a href="#dogru">Ne kadar doğru?</a><a href="#sozluk">Sözlük</a>
 </nav>
@@ -89,6 +112,106 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px;paddin
 </svg>
 <figcaption>Her kare için tutulan su hesabı. Su hiçbir yerde kendiliğinden yok olmaz ya da çoğalmaz.</figcaption>
 </figure>
+</section>
+
+<section id="terimler">
+<h2>Terimler, kısaca</h2>
+<p>Sayfanın ve simülasyonun kullandığı birkaç kelimeyi küçük animasyonlarla anlatalım.</p>
+<div class="terms">
+
+<div class="term">
+<h3>Yağış: 1 mm ne demek?</h3>
+<svg viewBox="0 0 300 140" role="img" aria-label="1 metrekarelik kaba 1 mm su birikir, bu 1 litredir">
+  <g stroke="#9fd2ff" stroke-width="2"><line class="an-fall" style="animation-delay:0s" x1="110" y1="20" x2="108" y2="30"/><line class="an-fall" style="animation-delay:0.35s" x1="140" y1="20" x2="138" y2="30"/><line class="an-fall" style="animation-delay:0.7s" x1="170" y1="20" x2="168" y2="30"/><line class="an-fall" style="animation-delay:0.2s" x1="200" y1="20" x2="198" y2="30"/></g>
+  <rect x="90" y="108" width="130" height="10" fill="#2f6fae" class="an-fill"/>
+  <path d="M86 80 V120 H224 V80" fill="none" stroke="#8b98a5" stroke-width="2"/>
+  <text x="155" y="136" text-anchor="middle" class="m">1 m × 1 m kap</text>
+  <text x="232" y="110" class="t">1 mm</text>
+  <text x="232" y="127" class="t">= 1 litre</text>
+</svg>
+<p>Bir metrekarelik düz bir kaba 1 mm su birikirse kapta 1 litre su vardır. Yani "100 mm yağdı" demek, her metrekareye 100 litre su düştü demek.</p>
+</div>
+
+<div class="term">
+<h3>Şiddet: mm/sa</h3>
+<svg viewBox="0 0 300 140" role="img" aria-label="Aynı bir saatte 5 mm/sa yağış az, 40 mm/sa yağış çok su biriktirir">
+  <g stroke="#9fd2ff" stroke-width="2"><line class="an-fall" style="animation-delay:0s" x1="70" y1="8" x2="68" y2="18"/><line class="an-fall" style="animation-delay:0s" x1="200" y1="8" x2="198" y2="18"/><line class="an-fall" style="animation-delay:0.15s" x1="215" y1="8" x2="213" y2="18"/><line class="an-fall" style="animation-delay:0.3s" x1="230" y1="8" x2="228" y2="18"/><line class="an-fall" style="animation-delay:0.45s" x1="245" y1="8" x2="243" y2="18"/><line class="an-fall" style="animation-delay:0.6s" x1="222" y1="8" x2="220" y2="18"/><line class="an-fall" style="animation-delay:0.75s" x1="207" y1="8" x2="205" y2="18"/></g>
+  <rect x="50" y="57" width="50" height="63" fill="none" stroke="#8b98a5" stroke-width="2"/>
+  <rect x="200" y="57" width="50" height="63" fill="none" stroke="#8b98a5" stroke-width="2"/>
+  <rect x="52" y="112" width="46" height="7" fill="#2f6fae" class="an-fill"/>
+  <rect x="202" y="64" width="46" height="55" fill="#2f6fae" class="an-fill"/>
+  <text x="75" y="136" text-anchor="middle" class="t">5 mm/sa</text>
+  <text x="225" y="136" text-anchor="middle" class="t">40 mm/sa</text>
+  <text x="150" y="92" text-anchor="middle" class="m">1 saat</text>
+</svg>
+<p>Bir saatte kaç mm yağdığı. 5 mm/sa normal yağmur, 40 mm/sa sağanak. Aynı toplam yağış kısa sürede düşerse toprak ve borular yetişemez; sel daha çok bundan çıkar.</p>
+</div>
+
+<div class="term">
+<h3>Sızma (zemin emişi)</h3>
+<svg viewBox="0 0 300 140" role="img" aria-label="Su toprağa sızar; ıslak kısım önce hızlı sonra yavaş derinleşir">
+  <g stroke="#9fd2ff" stroke-width="2"><line class="an-fall" style="animation-delay:0s" x1="60" y1="0" x2="58" y2="10"/><line class="an-fall" style="animation-delay:0.4s" x1="110" y1="0" x2="108" y2="10"/><line class="an-fall" style="animation-delay:0.2s" x1="160" y1="0" x2="158" y2="10"/><line class="an-fall" style="animation-delay:0.6s" x1="210" y1="0" x2="208" y2="10"/><line class="an-fall" style="animation-delay:0.8s" x1="250" y1="0" x2="248" y2="10"/></g>
+  <rect x="20" y="60" width="260" height="70" fill="#5b4330"/>
+  <rect x="20" y="60" width="260" height="70" fill="#2b1d12" class="an-soak"/>
+  <rect x="20" y="56" width="260" height="4" fill="#2f6fae" opacity=".8"/>
+  <text x="28" y="124" class="m">kuru toprak</text>
+  <text x="200" y="80" class="t">ıslanan kısım</text>
+</svg>
+<p>Suyun toprağa girmesi. Kuru toprak önce hızlı emer, ıslandıkça yavaşlar. Saatte kaç mm emdiğiyle ölçülür: yağış bundan hızlıysa fazlası yüzeyde kalır.</p>
+</div>
+
+<div class="term">
+<h3>Yüzey akışı</h3>
+<svg viewBox="0 0 300 140" role="img" aria-label="Toprağın almadığı su yokuş aşağı akar ve çukurda birikir">
+  <polygon points="10,40 200,100 290,104 290,140 10,140" fill="#2a3542"/>
+  <rect x="215" y="96" width="75" height="8" fill="#2f6fae" class="an-fill" style="animation-duration:6s"/>
+  <g fill="#22e0ff">
+    <circle class="an-slide" cx="30" cy="40" r="4"/>
+    <circle class="an-slide" style="animation-delay:.75s" cx="30" cy="40" r="4"/>
+    <circle class="an-slide" style="animation-delay:1.5s" cx="30" cy="40" r="4"/>
+    <circle class="an-slide" style="animation-delay:2.25s" cx="30" cy="40" r="4"/>
+  </g>
+  <text x="20" y="126" class="m">yamaç</text><text x="220" y="126" class="m">vadi tabanı</text>
+</svg>
+<p>Toprağın ve kanalizasyonun alamadığı su yüzeyde kalır ve yokuş aşağı akar. Alçak yerlerde, vadi tabanlarında ve alt geçitlerde toplanır.</p>
+</div>
+
+<div class="term">
+<h3>Debi: m³/s</h3>
+<svg viewBox="0 0 300 140" role="img" aria-label="Bir çizgiden saniyede geçen su küpleri sayılır">
+  <rect x="0" y="70" width="300" height="50" fill="#163a5c"/>
+  <g fill="#4ea8ff" stroke="#9fd2ff">
+    <rect class="an-pass" x="0" y="80" width="30" height="30"/>
+    <rect class="an-pass" style="animation-delay:1s" x="0" y="80" width="30" height="30"/>
+    <rect class="an-pass" style="animation-delay:2s" x="0" y="80" width="30" height="30"/>
+    <rect class="an-pass" style="animation-delay:3s" x="0" y="80" width="30" height="30"/>
+  </g>
+  <line x1="150" y1="58" x2="150" y2="128" stroke="#ffb020" stroke-width="3" stroke-dasharray="6 4"/>
+  <text x="158" y="54" class="t an-tick">her saniye 1 küp</text>
+  <text x="8" y="40" class="m">1 küp = 1 m³ = 1000 litre</text>
+</svg>
+<p>Bir dereden bir saniyede geçen su hacmi. Saniyede 1 m³, her saniye 1000 litre demek. Simülasyonda dışarıdan gelen suyun hızı bu birimle yazar.</p>
+</div>
+
+<div class="term">
+<h3>Havza</h3>
+<svg viewBox="0 0 300 140" role="img" aria-label="Havzaya düşen her damla dereler boyunca aynı çıkış noktasına akar">
+  <path d="M20 20 Q150 -10 280 20 Q300 80 160 130 Q0 80 20 20Z" fill="#1d2a20" stroke="#3fe0a8" stroke-dasharray="5 4"/>
+  <g stroke="#22e0ff" stroke-width="2.5" fill="none">
+    <path d="M50 35 Q100 70 155 120"/><path d="M250 35 Q200 75 158 120"/><path d="M150 25 V118"/>
+  </g>
+  <g fill="#9fd2ff">
+    <circle class="an-path" r="4" style="offset-path:path('M50 35 Q100 70 155 120')"/>
+    <circle class="an-path" r="4" style="offset-path:path('M250 35 Q200 75 158 120');animation-delay:1s"/>
+    <circle class="an-path" r="4" style="offset-path:path('M150 25 V118');animation-delay:2s"/>
+  </g>
+  <circle cx="157" cy="124" r="6" fill="#ffb020" class="an-tick"/>
+  <text x="170" y="134" class="m">çıkış</text>
+</svg>
+<p>Yağan suyun aynı noktaya aktığı alan. Bir derenin taşması yalnızca oraya düşen yağmura değil, yukarıdaki bütün havzaya düşen yağmura bağlıdır.</p>
+</div>
+
+</div>
 </section>
 
 <section id="yagis">
@@ -141,7 +264,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px;paddin
 </ul>
 <p>Toprak, doyunca ne kadar emeceğini belirler. Bitki örtüsü kuruyken emişi artırır: kuru toprak ormanın altında, çıplak haline göre yaklaşık iki kat hızlı emer. Yapı ve yol olan kısım beton gibi sayılır. Değerler hidroloji kitaplarındaki tablolardan alınmıştır (Rawls vd. 1983; Akan 1993).</p>
 <p>Suyun yolu da önemli. Betondan akan su yamaçtan aşağı inip bir ormana ya da çayıra girerse orada emilmeye devam eder. Buna <b>run-on</b> (üstten gelen suyun emilmesi) denir. Her hücre kendi aldığı suyla ıslanır: yamaçtan su alan vadi tabanı ya da orman kenarı çabuk doyar, yalnız yağmur alan tepe daha geç doyar.</p>
-<p>Görünüm menüsündeki <b>Zemin emişi haritası</b> her hücrenin o anki emişini renklerle gösterir. Fareyi bir noktada tutunca o hücrenin zemini ve şu an saatte kaç mm emdiği yazar.</p>
+<p>Sol paneldeki <b>🌱 Zemin emişi haritası</b> düğmesi emişi renklerle gösterir. <b>Şu an</b> görünümünde renkler yağmur sürdükçe kırmızıya döner; bu, zeminin doyduğunu gösterir. <b>Kuruyken</b> görünümü orman, tarla ve beton arasındaki farkı en iyi gösterir. Fareyi bir noktada tutunca o hücrenin zemini ve şu an saatte kaç mm emdiği yazar.</p>
 <p>Bu harita da bir tahmindir. Kentlerde toprak ölçümü yoktur; değer çevredeki tahminlerden doldurulur. Karst alanlarında harita emişi büyük olasılıkla az gösterir; orada asıl araç karst modudur.</p>
 </section>
 
