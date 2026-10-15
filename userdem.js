@@ -21,6 +21,11 @@
     }));
   }
 
+  // seçili yükseklik verisi: "srtm" (varsayılan), "fab" (FABDEM), "own" (kendi GeoTIFF'in). Seçim hatırlanır;
+  // dosyanın kendisi saklanamaz, "own" seçiliyken sayfa yenilenirse dosyanın yeniden seçilmesi istenir.
+  let MODE = "srtm"; try{ MODE = localStorage.getItem("demSrc") || "srtm"; }catch(e){}
+  if(!["srtm", "fab", "own"].includes(MODE)) MODE = "srtm";
+  let FABCOV = null;     // son yüklenen pencerede FABDEM kapsaması (0–1)
   let U = null;          // yüklü DEM
   let LAST = null;       // son yüklenen bölgede DEM'in katkısı {cov, res, cell, lvl}
   window.UDEM_TAG = "";
@@ -109,7 +114,7 @@
   // ---------- örnekleme: loadRegion çağırır ----------
   // g: {n, x0, y0, lat} — pencere 512×512 Mercator pikseli, her hücre 2×2 piksel. nb yerinde değiştirilir.
   async function sample(nb, g, prog){
-    if(!U){ LAST = null; return null; }
+    if(!U || MODE !== "own"){ LAST = null; return null; }
     const u = U, cellM = 156543.03*Math.cos(g.lat*D2R)/g.n*2;
     // seyrek kafes üzerinde tam dönüşüm, aradaki noktalar doğrusal (15 km'de UTM eğriliği ihmal edilir)
     const LT = 32, st = 512/LT, CC = new Float64Array((LT+1)*(LT+1)), RR = new Float64Array((LT+1)*(LT+1));
@@ -185,11 +190,18 @@
   window.udemSample = sample;
 
   // ---------- arayüz ----------
+  const SRC = {
+    srtm: {t: "Varsayılan (SRTM tabanlı, ~30 m)", d: "AWS Terrain Tiles (SRTM vd.). Yüzey modelidir: bina ve ağaç yükseklikleri araziye karışabilir."},
+    fab: {t: "FABDEM (30 m, çıplak zemin)", d: "Copernicus DEM'den binalar ve orman çıkarılmış çıplak zemin (FABDEM v1-2, Hawker vd. 2022). Karst alanları, dağlar ve Kağıthane test yaması için hazır; başka yerlerde varsayılan kullanılır."},
+    own: {t: "Kendi DEM'in (GeoTIFF)", d: "Daha ayrıntılı ya da lisanslı DEM'ini (TanDEM-X, HGM, İHA…) kendi bilgisayarından seç."},
+  };
   let foot = null; // seçim haritasında DEM kapsamı
   const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
   const m1 = v => fmt(v, v < 10 ? 1 : 0);
+  const opts = () => Object.entries(SRC).map(([k, v]) => `<option value="${k}"${k === MODE ? " selected" : ""}>${v.t}</option>`).join("");
   function mount(el, where){
-    el.innerHTML = `<label class="udem-drop"><input type="file" accept=".tif,.tiff,image/tiff" hidden>
+    el.innerHTML = (where === "settings" ? `<label>Yükseklik verisi</label><select class="udem-src">${opts()}</select><p class="sub udem-d"></p>` : "") +
+      `<label class="udem-drop"><input type="file" accept=".tif,.tiff,image/tiff" hidden>
       <b>⛰️ Kendi DEM'ini yükle (GeoTIFF)</b>
       <small>Dosya bilgisayarından çıkmaz, sadece tarayıcıda okunur. Tek bantlı; EPSG:4326, UTM, 3857, TUREF/TM.</small></label>
       <div class="udem-info" hidden></div>`;
@@ -198,6 +210,7 @@
     drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
     drop.addEventListener("dragleave", () => drop.classList.remove("over"));
     drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); const f = e.dataTransfer.files[0]; if(f) use(f, where); });
+    const sel = el.querySelector(".udem-src"); if(sel) sel.onchange = () => setMode(sel.value);
   }
   const boxes = () => [$("udemPk"), $("udemSet")].filter(Boolean);
   function info(html){ for(const b of boxes()){ const i = b.querySelector(".udem-info"); i.hidden = !html; i.innerHTML = html || ""; wire(i); } }
@@ -206,8 +219,23 @@
     const sm = i.querySelector("[data-a=smooth]"); if(sm) sm.onchange = () => { if(!U) return; U.smooth = sm.checked; render(); if(LAST && LAST.cov > 0 && S.loaded) loadRegion(); };
     const sz = i.querySelector("[data-a=size]"); if(sz) sz.onclick = () => { setSize(sz.dataset.k); pickSet(P.lat, P.lon, P.name, true); render(); };
   }
+  // kaynak değişince: seçim hatırlanır, taban karo kaynağı (DEMSRC) ayarlanır, yüklü bölge yeniden kurulur
+  function setMode(m, noReload){
+    const was = MODE, wasBase = DEMSRC, wasOwn = was === "own" && U && LAST && LAST.cov > 0;
+    MODE = m; try{ localStorage.setItem("demSrc", m); }catch(e){}
+    DEMSRC = m === "fab" ? "fab" : "srtm";
+    if(m === "fab") fabIndex();
+    render();
+    const changed = DEMSRC !== wasBase || wasOwn || (m === "own" && U);
+    if(!noReload && changed && S.loaded && was !== m) loadRegion();
+  }
+  window.demSrcSet = setMode;
   function render(){
-    if(!U){ info(""); badge(); return; }
+    for(const sel of document.querySelectorAll(".udem-src")) sel.value = MODE;
+    for(const d of document.querySelectorAll(".udem-d")) d.textContent = SRC[MODE].d;
+    const dz = $("udemSet") && $("udemSet").querySelector(".udem-drop"); if(dz) dz.hidden = MODE !== "own";
+    if(!U){ info(MODE === "own" ? `<span class="muted">Kendi DEM'in seçili ama dosya yok (sayfa yenilenince dosya yeniden seçilmeli). Şimdilik varsayılan yükseklik kullanılıyor.</span>` : ""); badge(); return; }
+    if(MODE !== "own"){ info(`<span class="muted">Yüklü dosya: ${esc(U.name)} (${m1(U.resM)} m) — kullanmak için “${SRC.own.t}” seç.</span> <button class="btn ghost sm" data-a="reset">Dosyayı kaldır</button>`); badge(); return; }
     const u = U, sug = suggestSize(u), pkCell = cellOf(P.size, u.clat);
     const ov = u.lv.length > 1 ? ` · ${u.lv.length - 1} genel bakış katmanı` : "";
     const typ = (u.fmtc === 3 ? "Float" : u.fmtc === 2 ? "Int" : "UInt") + u.bits;
@@ -222,13 +250,29 @@
       `<br><button class="btn ghost sm" data-a="reset" style="margin-top:6px">↩︎ Varsayılan DEM'e dön</button>`;
     info(h); badge();
   }
+  // "Yükseklik: …" — bölge kartında (kaynak seçicisiyle) ve HUD'da
+  function status(){
+    if(MODE === "own"){
+      if(!U) return {txt: "kendi DEM'in seçili, dosya yok — varsayılan kullanılıyor", warn: true};
+      if(LAST && LAST.cov > 0) return {txt: `kendi DEM'in (${m1(U.resM)} m)${LAST.cov < 0.995 ? ` · alanın %${fmt(LAST.cov*100)}'i, gerisi varsayılan` : ""}`, warn: LAST.cov < 0.995, on: true};
+      return {txt: "kendi DEM'in bu alanda yok — varsayılan kullanılıyor", warn: true};
+    }
+    if(MODE === "fab"){
+      if(FABCOV === null) return {txt: "FABDEM (30 m, çıplak zemin)", on: true};
+      if(FABCOV >= 0.995) return {txt: "FABDEM (30 m, çıplak zemin)", on: true};
+      if(FABCOV > 0) return {txt: `FABDEM alanın %${fmt(FABCOV*100)}'inde, gerisi varsayılan`, warn: true, on: true};
+      return {txt: "FABDEM bu alanda yok — varsayılan (SRTM) kullanılıyor", warn: true};
+    }
+    return {txt: "varsayılan (SRTM tabanlı, ~30 m)"};
+  }
   function badge(){
-    const on = U && LAST && LAST.cov > 0;
-    const txt = on ? `Yükseklik: kendi DEM'in (${m1(U.resM)} m)${LAST.cov < 0.995 ? ` · %${fmt(LAST.cov*100)} kapsama` : ""}` : "";
-    window.UDEM_TAG = on ? `<br><span style="color:var(--amber)">⛰️ ${txt}</span>` : "";
+    const st = status();
+    window.UDEM_TAG = MODE === "srtm" ? "" : `<br><span style="color:${st.warn ? "var(--amber)" : "#7ee0a1"}">⛰️ Yükseklik: ${st.txt}</span>`;
     const b = $("demBadge"); if(!b) return;
-    b.hidden = !U;
-    b.innerHTML = !U ? "" : (on ? `⛰️ ${txt}` : `⛰️ Kendi DEM'in yüklü, bu alanda verisi yok`) + ` · <a href="#" id="demReset">varsayılana dön</a>`;
+    b.hidden = false;
+    b.innerHTML = `⛰️ <select class="udem-src demsel" title="Yükseklik verisi">${opts()}</select>${MODE === "srtm" ? "" : `<span class="demst${st.warn ? " warn" : ""}">${st.txt}</span>`}` +
+      (MODE === "own" && U ? ` · <a href="#" id="demReset">varsayılana dön</a>` : "");
+    b.querySelector("select").onchange = e => setMode(e.target.value);
     const a = $("demReset"); if(a) a.onclick = e => { e.preventDefault(); reset(); };
     if(typeof updStats === "function" && S.loaded) try{ updStats(); }catch(e){}
   }
@@ -238,8 +282,10 @@
     foot = L.rectangle([[U.bbox.s, U.bbox.w], [U.bbox.n, U.bbox.e]], {color: "#ffb020", weight: 2, fillOpacity: .06, interactive: false}).addTo(pmap);
   }
   function reset(){
-    const used = LAST && LAST.cov > 0;
-    U = null; LAST = null; drawFoot(); render();
+    const used = MODE === "own" && LAST && LAST.cov > 0;
+    U = null; LAST = null; drawFoot();
+    if(MODE === "own"){ MODE = "srtm"; try{ localStorage.setItem("demSrc", "srtm"); }catch(e){} DEMSRC = "srtm"; }
+    render();
     if(used && S.loaded) loadRegion();
   }
   async function use(file, where){
@@ -247,7 +293,7 @@
     let u;
     try{ u = await openDEM(file); }
     catch(e){ console.warn(e); info(`<span style="color:var(--warn)">⚠️ ${esc(e.message || e)}</span>`); return; }
-    U = u; LAST = null; drawFoot();
+    U = u; LAST = null; drawFoot(); setMode("own", true);
     const sug = suggestSize(u);
     if(where === "picker"){
       setSize(sug);
@@ -264,6 +310,20 @@
       await loadRegion();
     }
   }
-  window.udemLoaded = () => render(); // loadRegion sonunda: kapsama bilgisini güncelle
+  // loadRegion sonunda: FABDEM kapsaması (pencerede 16×16 noktada z12 karo var mı) ve rozet
+  window.udemLoaded = () => {
+    FABCOV = null;
+    if(MODE === "fab" && FAB.set && REG){
+      let c = 0; const sc = 2**(REG.zd - 12);
+      for(let j = 0; j < 16; j++) for(let i = 0; i < 16; i++){
+        const x = Math.floor((REG.x0 + (i + 0.5)*32)/sc/256), y = Math.floor((REG.y0 + (j + 0.5)*32)/sc/256);
+        if(FAB.set.has(x + "/" + y)) c++;
+      }
+      FABCOV = c/256;
+    }
+    render();
+  };
   for(const b of boxes()) mount(b, b.id === "udemPk" ? "picker" : "settings");
+  DEMSRC = MODE === "fab" ? "fab" : "srtm";
+  render();
 })();

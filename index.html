@@ -206,7 +206,9 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .udem-info{font-size:12px;line-height:1.45;margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .udem-info .btn.sm{padding:3px 8px;font-size:11px}
 .udem-sm{display:block;margin:6px 0 2px;cursor:pointer;font-size:12px}.udem-sm input{vertical-align:middle;margin:0 5px 0 0}
-#demBadge{display:block;color:var(--amber)}#demBadge a{color:var(--accent)}
+#demBadge{display:block;margin-top:3px;font-size:11.5px;color:var(--muted)}#demBadge a{color:var(--accent)}
+.demsel{max-width:100%;font:inherit;font-size:11.5px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:1px 3px;margin-right:4px}
+.demst{display:block}.demst.warn{color:var(--amber)}
 .pk-sel{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
 .pk-sel b{font-size:15px}
 .pk-go{padding:13px;font-size:15px;border-radius:12px}
@@ -303,6 +305,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <div>
         <div class="lbl">Alan büyüklüğü</div>
         <div class="seg" id="segSize"></div>
+        <div class="muted" style="font-size:10.5px;margin-top:5px">“Küçük” pencere yalnızca daha sık örnekler; daha ince bir DEM (ör. kendi DEM'in) kullanılmadıkça gerçek ayrıntı eklemez.</div>
       </div>
       <div>
         <div class="lbl">Uydu görüntü kalitesi</div>
@@ -418,7 +421,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <p class="note">
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür, ama oraya düşen yağmurun bu alana akan kısmı kaba bir havza modeliyle kenardan girer ("Havzadan gelen su"); kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
-    Veri: AWS Terrain Tiles (SRTM vd.; isteğe bağlı olarak kullanıcının kendi DEM dosyası, yalnızca tarayıcıda okunur, geotiff.js + proj4js) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
+    Veri: AWS Terrain Tiles (SRTM vd.) · FABDEM v1-2 (Hawker vd. 2022, “A 30 m global map of elevation with forests and buildings removed”, Environ. Res. Lett. 17 024016; University of Bristol, CC BY-NC-SA 4.0; karst/dağ/Kağıthane karoları bu lisansla türetildi) — Copernicus WorldDEM-30 © DLR e.V. 2010-2014 ve © Airbus Defence and Space GmbH 2014-2018, Copernicus programı kapsamında AB ve ESA tarafından sağlanmıştır; tüm hakları saklıdır · isteğe bağlı olarak kullanıcının kendi DEM dosyası (yalnızca tarayıcıda okunur; geotiff.js, proj4js) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
   </p>
 </div>
 </aside>
@@ -741,10 +744,18 @@ function loadBitmap(url,hi){
 }
 // yükseklik karosu → Float32Array(256×256) metre; çözülmüş hali önbellekte (ham görüntü atılır)
 const DEMC=new Map(); let decCv=null;
-function demTile(z,x,y,hi){
-  const key=z+"/"+x+"/"+y; let p=lruGet(DEMC,key); if(p) return p;
-  const url=DEM_URL(z,x,y);
-  p=loadBitmap(url,hi).then(bm=>{
+// Yükseklik kaynağı (Görünüm → Yükseklik verisi, userdem.js): "srtm" AWS terrarium; "fab" FABDEM v1-2 çıplak zemin
+// (dem/fabdem/12, yalnızca karst alanları, dağlar ve Kağıthane test yaması). FABDEM 30 m olduğundan yalnızca z12
+// saklanır; z13–14 istekleri z12 karosundan çift doğrusal büyütülür, kapsam dışı ya da inmeyen karo AWS'ye düşer.
+let DEMSRC="srtm"; try{ if(localStorage.getItem("demSrc")==="fab") DEMSRC="fab"; }catch(e){}
+const FAB={idx:null, set:null};
+function fabIndex(){
+  return FAB.idx || (FAB.idx=fetch("dem/fabdem/index.json").then(r=>r.ok?r.json():{tiles:[]}).catch(()=>({tiles:[]}))
+    .then(j=>{ FAB.set=new Set(j.tiles); return FAB.set; }));
+}
+const fabHas=(z,x,y)=>!!FAB.set && z>=12 && FAB.set.has((x>>(z-12))+"/"+(y>>(z-12)));
+function decodeTile(url,hi){
+  return loadBitmap(url,hi).then(bm=>{
     if(!decCv) decCv=typeof OffscreenCanvas!=="undefined" ? new OffscreenCanvas(256,256) : Object.assign(document.createElement("canvas"),{width:256,height:256});
     const g=decCv.getContext("2d",{willReadFrequently:true}); g.clearRect(0,0,256,256); g.drawImage(bm,0,0);
     const px=g.getImageData(0,0,256,256).data, h=new Float32Array(65536);
@@ -752,6 +763,28 @@ function demTile(z,x,y,hi){
     BMP.delete(url);
     return h;
   });
+}
+async function fabTile(z,x,y,hi){
+  await fabIndex();
+  if(!fabHas(z,x,y)) return decodeTile(DEM_URL(z,x,y),hi);
+  const dz=z-12, px=x>>dz, py=y>>dz;
+  let par;
+  try{ par=await demTile(12,px,py,hi,"fab12"); }catch(e){ return decodeTile(DEM_URL(z,x,y),hi); }
+  if(!dz) return par;
+  const f=2**dz, ox=(x-(px<<dz))*256/f, oy=(y-(py<<dz))*256/f, h=new Float32Array(65536);
+  for(let j=0;j<256;j++){
+    const v=Math.min(255,Math.max(0,oy+(j+0.5)/f-0.5)), y0=Math.min(254,v|0), ty=v-y0;
+    for(let i=0;i<256;i++){
+      const u=Math.min(255,Math.max(0,ox+(i+0.5)/f-0.5)), x0=Math.min(254,u|0), tx=u-x0, k=y0*256+x0;
+      h[j*256+i]=(par[k]*(1-tx)+par[k+1]*tx)*(1-ty)+(par[k+256]*(1-tx)+par[k+257]*tx)*ty;
+    }
+  }
+  return h;
+}
+function demTile(z,x,y,hi,raw){
+  const fab=raw!=="fab12" && DEMSRC==="fab" && z>=12;
+  const key=(raw==="fab12"?"F":fab?"f":"")+z+"/"+x+"/"+y; let p=lruGet(DEMC,key); if(p) return p;
+  p=raw==="fab12" ? decodeTile(`dem/fabdem/12/${x}/${y}.png`,hi) : fab ? fabTile(z,x,y,hi) : decodeTile(DEM_URL(z,x,y),hi);
   p.catch(()=>{ if(DEMC.get(key)===p) DEMC.delete(key); });
   lruPut(DEMC,key,p,MOBILE?120:320);
   return p;
