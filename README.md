@@ -50,11 +50,11 @@ Her şey tarayıcıda, JavaScript ve Three.js ile hesaplanır; sunucu tarafı yo
 
 ## Ne kadar doğru?
 
-Model, 14 Ekim 2026 selinde haberlerde ve resmî açıklamalarda geçen 74 su baskını noktasıyla karşılaştırıldı ([rapor](docs/dogrulama-14ekim.md), [nokta listesi](docs/dogrulama-14ekim-noktalar.csv)):
+Modeli 14 Ekim 2026 selinde su bastığı haberlere yansıyan 74 noktayla karşılaştırdık ([rapor](docs/dogrulama-14ekim.md), [nokta listesi](docs/dogrulama-14ekim-noktalar.csv)):
 
-- Simülasyon pencerelerine düşen 39 noktanın **%74'ünde** model çevrede (150–750 m) en az 10 cm su biriktirdi; rastgele noktalarda bu oran %56. Sabit sızmalı ilk sürümde isabet %56'ydı.
-- Model **suyun hangi vadide ve çukurda toplanacağını** kabaca bilir, **hangi sokakta** toplanacağını bilmez.
-- Zeminin doyması (Horton) ve yukarı havzadan kayıpsız gelen su sayesinde, ilk sürümde "kuru" kalan dere taşkınları (Kemerburgaz, Riva) artık görünüyor. Alt geçit, tünel ve metro baskınlarını arazi verisi göremiyor; kaçırılan 10 noktanın 6'sı bunlar.
+- Simülasyon bölgelerine düşen 39 noktanın **%74'ünde** model yakınında en az 10 cm su biriktirdi. Rastgele noktalarda bu oran %56.
+- Model suyun **hangi vadide** toplanacağını kabaca bilir, **hangi sokakta** toplanacağını bilmez.
+- Kaçırılan 10 noktanın 6'sı alt geçit, tünel ya da metro; arazi verisi bunları görmüyor.
 
 ## Sınırlamalar
 
