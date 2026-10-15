@@ -62,7 +62,8 @@ if(document.readyState === "loading") document.write('<script src="osm-cache.js"
   const scen = $("scen");
   const chipP = document.createElement("button"); chipP.className = "chip"; chipP.id = "rrChip";
   const chipF = document.createElement("button"); chipF.className = "chip"; chipF.id = "fcChip";
-  scen.prepend(chipP, chipF);
+  // "Dün akşam" senaryosu arayüzden kaldırıldı (kod duruyor; chipP sayfaya eklenmiyor). Yalnızca tahmin çipi gösterilir.
+  scen.prepend(chipF);
 
   const box = document.createElement("div");
   box.id = "rrBox";
