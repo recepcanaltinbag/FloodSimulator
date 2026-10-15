@@ -2510,14 +2510,25 @@ function resize(){ const w=view.clientWidth,h=view.clientHeight; renderer.setSiz
 addEventListener("resize",resize); resize();
 
 let last=performance.now(), statAcc=0, bldAcc=0;
+// Hız sabitleme: kuru hücreler atlandığından az sulu senaryoda (ör. tahmin) bir adım ~2,5 kat ucuz; "maksimum"da
+// bilgisayar yetiştiği kadar adım attığı için saat de o kadar hızlı akıyordu. Kare başına adım sayısı, ölçülen adım
+// süresinin "her yer sulu olsaydı" karşılığına göre sınırlanır. Ölçüm (Kağıthane): tamamen sulu adım kuru adımın ~2,8 katı,
+// sulu hücre oranı ~%60'a çıkınca neredeyse tam maliyete ulaşıyor. Böylece geçen süre senaryodan bağımsız aynı hızda ilerler.
+const STEP={reg:null, ref:0, wf:0, k:0};
 function loop(now){
   const rdt=Math.min(0.1,(now-last)/1000); last=now;
   if(MM.on){ requestAnimationFrame(loop); return; } // harita modunda 3B sahne ve simülasyon bekler
   if(S.running && S.loaded){
     const DT=0.35*Math.sqrt(S.cell/G);
     const target=S.speed*60*rdt, t0=performance.now();
-    let done=0;
-    while(done<target && performance.now()-t0<20){ simStep(DT); done+=DT; }
+    if(STEP.reg!==REG){ STEP.reg=REG; STEP.ref=0; STEP.wf=0; STEP.k=0; }
+    if(!(STEP.k++%15)){ let c=0; for(let i=0;i<d.length;i++) if(d[i]>0) c++; STEP.wf=c/d.length; }
+    const maxN=STEP.ref>0 ? Math.max(1,Math.floor(16/STEP.ref)) : Infinity;
+    let done=0, n=0;
+    while(done<target && n<maxN && performance.now()-t0<20){ simStep(DT); done+=DT; n++; }
+    if(n){ const full=(performance.now()-t0)/n * 2.8/(1+1.8*Math.min(1,STEP.wf/0.6));   // tamamen sulu adımın tahmini süresi
+      // düşüşe hemen, yükselişe yavaş uy: yükleme anındaki ve tek seferlik (GC, sekme arka planda) yavaş adımlar hızı kalıcı düşürmesin
+      STEP.ref = !STEP.ref || full<STEP.ref ? full : STEP.ref*0.98+full*0.02; }
     updateWaterMesh();
     statAcc+=rdt; if(statAcc>0.4){ statAcc=0; updStats(); drawDereOverlay(); }
   }
