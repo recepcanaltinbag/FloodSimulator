@@ -64,6 +64,8 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .nav{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:3}
 .nav button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:rgba(11,15,21,.8);color:var(--ink);font-size:17px;cursor:pointer;backdrop-filter:blur(6px)}
 .nav button:hover{border-color:var(--accent)}
+.shift{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:3;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.shift[hidden]{display:none}
 .help{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:11.5px;color:var(--muted);white-space:nowrap;pointer-events:none}
 @media (max-width:1100px),(hover:none){.help{display:none}}
 .panel{position:absolute;right:12px;top:12px;width:250px;max-height:45%;overflow-y:auto;background:rgba(11,15,21,.8);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:12px;backdrop-filter:blur(6px);z-index:3}
@@ -267,6 +269,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   </div>
 
   <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="flowOn" checked> Akış animasyonu <span class="muted" style="font-weight:400">(suyun aktığı yön)</span></label>
+  <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="ringOn" checked> Çevre arazisi <span class="muted" style="font-weight:400">(yalnız görünüm, simülasyon yok)</span></label>
   <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:4px;cursor:pointer"><input type="checkbox" id="bldOn"> 3B binalar <span class="muted" style="font-weight:400">(OpenStreetMap)</span></label>
   <label style="display:flex;gap:8px;align-items:center;font-size:12px;margin:0 0 4px 22px;cursor:pointer"><input type="checkbox" id="bldObs"> Su binaların etrafından aksın <span class="muted">(engel)</span></label>
   <div id="bldInfo" class="muted" style="font-size:11px;margin:0 0 10px 22px"></div>
@@ -275,7 +278,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="lbls" id="lblToggles"></div>
 
   <p class="note">
-    Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
+    Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür; kenara yaklaşınca "Bu bölgeye geç" ile simülasyon alanı oraya taşınır, su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
     Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim
   </p>
 </div>
@@ -300,6 +303,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <button id="nTop" title="Tepeden bak">⬇</button>
       <button id="nHome" title="Başa dön">⌂</button>
     </div>
+    <button class="btn shift" id="shiftBtn" hidden title="Simülasyon alanını buraya taşı; su korunur">Bu bölgeye geç →</button>
     <div class="help">Sol tık: kaydır · Sağ tık veya Ctrl+sürükle: döndür / eğ · Tekerlek: yakınlaş · Çift tık: oraya uç</div>
   </div>
   <div class="panel collapsed" id="derePanel">
@@ -507,17 +511,35 @@ async function loadTiles(z,cx,cy,size,urlFn,onProg){
 }
 function ov(text,frac){ $("overlay").style.display="flex"; $("ovText").textContent=text; $("ovBar").style.width=((frac||0)*100)+"%"; }
 
-async function loadRegion(){
-  S.running=false; updPlay(); clearBuildings();
+// shift: {sx,sy} hücre — etkin pencereyi kaydırır, suyu taşır, kamerayı yerinde tutar
+let shiftBusy=false;
+async function loadRegion(shift){
+  const wasRunning=S.running;
+  S.running=false; updPlay();
   $("play").disabled=$("reset").disabled=true;
-  const zd=SIZES[S.size].z, n=2**zd, cx=Math.round(lon2px(S.lon,n)), cy=Math.round(lat2py(S.lat,n)); // tam piksel: karolar kaymasın
-  REG={zd,n,x0:cx-256,y0:cy-256};
-  $("regName").textContent=S.name;
-  $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
+  const zd=SIZES[S.size].z, n=2**zd;
+  let cx, cy;
+  if(shift){ cx=REG.cx+2*shift.sx; cy=REG.cy+2*shift.sy; const ll=px2ll(cx,cy,n); S.lat=ll.lat; S.lon=ll.lon; }
+  else { cx=Math.round(lon2px(S.lon,n)); cy=Math.round(lat2py(S.lat,n)); } // tam piksel: karolar kaymasın
+  const prog=shift ? (t,f)=>shiftProg(f) : ov;
   try{
     const lt=`${S.name.replace(/ Deresi$/,"")} yükleniyor · yükseklik verisi…`;
-    ov(lt,0);
-    const demC=await loadTiles(zd,cx,cy,512,DEM_URL,f=>ov(lt,f*0.2));
+    prog(lt,0);
+    const demC=await loadTiles(zd,cx,cy,512,DEM_URL,f=>prog(lt,f*0.2));
+    const q=Math.min(S.q, MOBILE?2:3, Math.log2(maxTex/512)); // telefonda bellek için en fazla 2048 px
+    const zs=zd+q, sz=512*2**q, k=2**q;
+    let sat=null;
+    try{
+      const raw=await loadTiles(zs,cx*k,cy*k,sz,SAT_URL,f=>prog(`Uydu görüntüsü indiriliyor… (${sz}×${sz})`,0.2+f*0.75));
+      sat=enhance(raw);
+    }catch(e){}
+    // ---- indirmeler bitti: buradan sonrası eşzamanlı (simülasyon döngüsü eski dizileri karışık görmesin) ----
+    const old=shift ? {d, sea, reg:REG} : null;
+    if(shift){ S.name=nearestSuburb(S.lat,S.lon)||"Seçili alan"; }
+    else clearBuildings();
+    REG={zd,n,x0:cx-256,y0:cy-256};
+    $("regName").textContent=S.name;
+    $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
     const px=demC.getContext("2d").getImageData(0,0,512,512).data;
     b=new Float32Array(N*N);
     for(let y=0;y<N;y++)for(let x=0;x<N;x++){
@@ -535,25 +557,42 @@ async function loadRegion(){
     S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
     elevCanvas=makeElevCanvas();
 
-    const q=Math.min(S.q, MOBILE?2:3, Math.log2(maxTex/512)); // telefonda bellek için en fazla 2048 px
-    const zs=zd+q, sz=512*2**q, k=2**q;
     roadCanvas=null; blendCanvas=null;
-    try{
-      const raw=await loadTiles(zs,cx*k,cy*k,sz,SAT_URL,f=>ov(`Uydu görüntüsü indiriliyor… (${sz}×${sz})`,0.2+f*0.75));
-      satCanvas=enhance(raw);
-    }catch(e){ satCanvas=null; $("tex").value="elev"; }
+    satCanvas=sat; if(!sat) $("tex").value="elev";
     REG.zs=zs; REG.sz=sz; REG.k=k; REG.cx=cx; REG.cy=cy;
 
-    ov("Sahne hazırlanıyor…",1);
-    resetWater(); buildScene();
+    if(!shift) ov("Sahne hazırlanıyor…",1);
+    if(shift){
+      // su taşıma: yeni (x,y) hücresi = eski (x+sx, y+sy); akılar sıfırlanır, istatistikler sürer
+      const sim={simT:S.simT,rainMM:S.rainMM,stored:S.stored,drained:S.drained};
+      resetWater(); Object.assign(S,sim);
+      for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+        const i=y*N+x; if(sea[i]) continue;
+        const ox=x+shift.sx, oy=y+shift.sy; if(ox<0||oy<0||ox>=N||oy>=N) continue;
+        const j=oy*N+ox; if(!old.sea[j]) d[i]=old.d[j];
+      }
+      const dx=shift.sx*SIZE/(N-1), dz=shift.sy*SIZE/(N-1);
+      fly=null; controls.target.x-=dx; controls.target.z-=dz; camera.position.x-=dx; camera.position.z-=dz;
+      fx.fill(-1); clearBuildings(); bldLastT=null;
+      buildScene(true);
+    } else { resetWater(); buildScene(); }
+    ringReset();
     S.loaded=true; $("overlay").style.display="none";
     $("play").disabled=$("reset").disabled=false;
-    S.running=true; updPlay(); // başlat butonu yok: yeni bölge yüklenince yağmur kendiliğinden başlar
+    S.running=shift?wasRunning:true; updPlay(); // başlat butonu yok: yeni bölge yüklenince yağmur kendiliğinden başlar
+    pickSet(S.lat,S.lon,S.name);
     loadLabels(true); // gömülü etiketler hemen; OSM etiketleri dere verisinden sonra
     loadDere().then(()=>loadLabels());
   }catch(e){
-    console.error(e); ov("Veri indirilemedi (internet bağlantısını kontrol et).",0);
+    console.error(e);
+    if(shift){ shiftProg(-1); S.running=wasRunning; $("play").disabled=$("reset").disabled=false; updPlay(); }
+    else ov("Veri indirilemedi (internet bağlantısını kontrol et).",0);
   }
+}
+function nearestSuburb(lat,lon){
+  let best=null, bd=1e9;
+  for(const l of (window.STATIC_LABELS||[])){ if(l.c!=="suburb") continue; const dd=hav({lat,lon},l); if(dd<bd){bd=dd;best=l.n;} }
+  return best && bd<4000 ? best : null;
 }
 // Kenara değmeyen küçük "deniz" adacıkları DEM boşluğudur: karaya çevir, komşulardan doldur
 function fillVoids(){
@@ -959,7 +998,7 @@ renderer.domElement.addEventListener("dblclick",e=>{
   const r=renderer.domElement.getBoundingClientRect();
   mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
   ray.setFromCamera(mouse,camera);
-  const hit=ray.intersectObject(terrainMesh)[0];
+  const hit=ray.intersectObjects([terrainMesh,...ringMeshes()])[0];
   if(hit) flyTo(hit.point,Math.max(12,camera.position.distanceTo(controls.target)*0.5));
 });
 // Ctrl / Shift + sol tık = döndür (Google Earth gibi)
@@ -1021,15 +1060,138 @@ const seaMat=new THREE.ShaderMaterial({
       gl_FragColor=vec4(col,m*0.94);
     }`
 });
-const seaGeo=new THREE.PlaneGeometry(SIZE,SIZE,1,1);
+const seaGeo=new THREE.PlaneGeometry(SIZE*512/510,SIZE*512/510,1,1); // zd pikselinde tam 512: çevre blokların denizine boşluksuz eklenir
 const seaMesh=new THREE.Mesh(seaGeo,seaMat); seaMesh.rotation.x=-Math.PI/2; seaMesh.position.y=0.02; seaMesh.renderOrder=0.5; seaMesh.visible=false; scene.add(seaMesh);
 function updateSea(t){ if(seaMesh.visible) seaMat.uniforms.uTime.value=t; }
 
-function buildScene(){
+// ================= Çevre halkası (yalnız görünüm) =================
+// Etkin bölgenin çevresindeki bölge büyüklüğündeki bloklar düşük çözünürlükte yüklenir; simülasyon yok.
+// Blok (i,j) zd pikselinde [c-256, c+256] aralığını kaplar (c = merkez + 512·i). Etkin bölgeye bakan kenar
+// köşeleri etkin ızgaranın son hücresine (±255) yapıştırılır ve yükseklik oradan alınır: dikiş açılmaz.
+const RING={on:true, R:MOBILE?1:2, M:64, tex:MOBILE?512:1024, tiles:new Map(), gen:0, busy:0};
+const RW=SIZE/510; // dünya birimi / zd pikseli
+function ringMeshes(){ const a=[]; RING.tiles.forEach(t=>{ if(t.mesh) a.push(t.mesh); }); return a; }
+function ringDispose(t){
+  if(t.mesh){ scene.remove(t.mesh); t.mesh.geometry.dispose(); if(t.mesh.material.map) t.mesh.material.map.dispose(); t.mesh.material.dispose(); }
+  if(t.sea){ scene.remove(t.sea); t.sea.geometry.dispose(); t.sea.material.uniforms.uMask.value.dispose(); t.sea.material.dispose(); }
+}
+function ringReset(){ RING.gen++; RING.tiles.forEach(ringDispose); RING.tiles.clear(); RING.busy=0; }
+function activeH(px,py){ // etkin arazinin gösterilen yüksekliği (m), zd pikselinde, çift doğrusal
+  const gx=Math.max(0,Math.min(N-1,(px-REG.cx+255)/2)), gy=Math.max(0,Math.min(N-1,(py-REG.cy+255)/2));
+  const x0=Math.min(N-2,Math.floor(gx)), y0=Math.min(N-2,Math.floor(gy)), fx_=gx-x0, fy_=gy-y0;
+  const v=i=>sea[i]?Math.max(b[i],-3):b[i], i=y0*N+x0;
+  return (v(i)*(1-fx_)+v(i+1)*fx_)*(1-fy_)+(v(i+N)*(1-fx_)+v(i+N+1)*fx_)*fy_;
+}
+function ringTick(){
+  if(!S.loaded||!REG) return;
+  const t=controls.target, R=RING.R, BW=512*RW;
+  if(!RING.on){ if(RING.tiles.size) ringReset(); return; }
+  const want=[];
+  for(let j=-R;j<=R;j++) for(let i=-R;i<=R;i++){
+    if(!i&&!j) continue;
+    const key=i+","+j, dd=Math.hypot(i*BW-t.x,j*BW-t.z), tl=RING.tiles.get(key);
+    if(tl && dd>2.4*SIZE){ ringDispose(tl); RING.tiles.delete(key); }
+    else if(!tl && dd<1.55*SIZE) want.push({i,j,key,dd});
+  }
+  want.sort((a,c)=>a.dd-c.dd);
+  for(const w of want){ if(RING.busy>=2) break; ringLoad(w); }
+}
+async function ringLoad({i,j,key}){
+  const gen=RING.gen, reg=REG, tl={i,j}; RING.tiles.set(key,tl); RING.busy++;
+  try{
+    const zd=reg.zd, c={x:reg.cx+512*i, y:reg.cy+512*j};
+    // yükseklik: zd-2 (blok başına 1–4 karo), gerçek konumda çift doğrusal örnekleme
+    const zr=zd-2, DS=136, ox=Math.round(c.x/4)-DS/2, oy=Math.round(c.y/4)-DS/2;
+    const demC=await loadTiles(zr,ox+DS/2,oy+DS/2,DS,DEM_URL);
+    const tq=RING.tex/512, tz=zd+Math.log2(tq);
+    let satC=null; try{ satC=enhance(await loadTiles(tz,c.x*tq,c.y*tq,RING.tex,SAT_URL)); }catch(e){}
+    if(gen!==RING.gen||RING.tiles.get(key)!==tl) return;
+    const px=demC.getContext("2d").getImageData(0,0,DS,DS).data;
+    const dem=new Float32Array(DS*DS);
+    for(let k=0;k<DS*DS;k++) dem[k]=px[k*4]*256+px[k*4+1]+px[k*4+2]/256-32768;
+    const H=(X,Y)=>{ // X,Y: zd pikseli
+      const u=Math.max(0,Math.min(DS-1.001,X/4-ox-0.5)), v=Math.max(0,Math.min(DS-1.001,Y/4-oy-0.5));
+      const x0=Math.floor(u), y0=Math.floor(v), a=u-x0, e=v-y0, k=y0*DS+x0;
+      return (dem[k]*(1-a)+dem[k+1]*a)*(1-e)+(dem[k+DS]*(1-a)+dem[k+DS+1]*a)*e;
+    };
+    // arazi ağı
+    const M=RING.M, pos=new Float32Array(M*M*3), uv=new Float32Array(M*M*2), hm=new Float32Array(M*M), idx=[];
+    for(let r=0;r<M;r++) for(let q=0;q<M;q++){
+      let X=c.x-256+512*q/(M-1), Y=c.y-256+512*r/(M-1);
+      const ax=Math.abs(X-reg.cx), ay=Math.abs(Y-reg.cy); let snap=false;
+      if(ax===256 && ay<=256){ X=reg.cx+Math.sign(X-reg.cx)*255; snap=true; }
+      if(ay===256 && ax<=256){ Y=reg.cy+Math.sign(Y-reg.cy)*255; snap=true; }
+      let h; if(snap) h=activeH(X,Y); else { h=H(X,Y); if(h<=0.3) h=Math.max(h,-3); }
+      const v=r*M+q; hm[v]=h;
+      pos[v*3]=(X-reg.cx)*RW; pos[v*3+2]=(Y-reg.cy)*RW;
+      uv[v*2]=(X-c.x+256)/512; uv[v*2+1]=1-(Y-c.y+256)/512;
+    }
+    for(let r=0;r<M-1;r++) for(let q=0;q<M-1;q++){ const a=r*M+q; idx.push(a,a+M,a+1, a+1,a+M,a+M+1); }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute("position",new THREE.BufferAttribute(pos,3)); geo.setAttribute("uv",new THREE.BufferAttribute(uv,2)); geo.setIndex(idx);
+    let mat;
+    if(satC){ const tx=new THREE.CanvasTexture(satC); tx.encoding=THREE.sRGBEncoding; tx.anisotropy=4; tx.wrapS=tx.wrapT=THREE.ClampToEdgeWrapping; mat=new THREE.MeshLambertMaterial({map:tx}); }
+    else mat=new THREE.MeshLambertMaterial({color:0x5a6650});
+    tl.mesh=new THREE.Mesh(geo,mat); tl.h=hm; scene.add(tl.mesh);
+    // deniz maskesi (etkin bölgedeki stilize deniz gölgelendiricisiyle aynı)
+    const MR=128, sm=new Uint8Array(MR*MR), mk=new Uint8Array(MR*MR*4); let any=false;
+    for(let r=0;r<MR;r++) for(let q=0;q<MR;q++){ const s1=H(c.x-256+512*(q+.5)/MR, c.y-256+512*(r+.5)/MR)<=0.3; sm[r*MR+q]=s1; if(s1) any=true; }
+    if(any){
+      const dist=new Float32Array(MR*MR).fill(1e9), qq=[], nb=(k,f)=>{ const x=k%MR; if(x>0)f(k-1); if(x<MR-1)f(k+1); if(k>=MR)f(k-MR); if(k<MR*MR-MR)f(k+MR); };
+      for(let k=0;k<MR*MR;k++) if(sm[k]) nb(k,o=>{ if(!sm[o]&&dist[k]){ dist[k]=0; qq.push(k); } });
+      for(let h=0;h<qq.length;h++){ const k=qq[h]; nb(k,o=>{ if(sm[o]&&dist[o]>dist[k]+1){ dist[o]=dist[k]+1; qq.push(o); } }); }
+      const cr=512/MR/2; // maske hücresi / etkin hücre
+      for(let r=0;r<MR;r++) for(let q=0;q<MR;q++){
+        const k=r*MR+q, o=((MR-1-r)*MR+q)*4;
+        let m=sm[k]?255:0; if(!sm[k]){ let n4=0; nb(k,o2=>{ n4+=sm[o2]; }); m=n4?Math.min(200,70*n4):0; }
+        mk[o]=m; mk[o+1]=sm[k]?Math.min(255,dist[k]*cr/22*255):0; mk[o+3]=255;
+      }
+      const mt=new THREE.DataTexture(mk,MR,MR,THREE.RGBAFormat); mt.magFilter=mt.minFilter=THREE.LinearFilter; mt.needsUpdate=true;
+      const smat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4,vertexShader:seaMat.vertexShader,fragmentShader:seaMat.fragmentShader,
+        uniforms:{uTime:seaMat.uniforms.uTime, uMask:{value:mt}}});
+      tl.sea=new THREE.Mesh(new THREE.PlaneGeometry(512*RW,512*RW),smat);
+      tl.sea.rotation.x=-Math.PI/2; tl.sea.position.set(512*i*RW,0.02,512*j*RW); tl.sea.renderOrder=0.5; scene.add(tl.sea);
+    }
+    ringScaleTile(tl);
+  }catch(e){ tl.fail=true; } // başarısız blok haritada kalır; uzaklaşınca silinir, sonra yeniden denenir
+  finally{ if(gen===RING.gen) RING.busy--; }
+}
+function ringScaleTile(tl){
+  if(!tl.mesh) return;
+  const p=tl.mesh.geometry.attributes.position, k=sc()*S.ex;
+  for(let v=0;v<tl.h.length;v++) p.array[v*3+1]=tl.h[v]*k;
+  p.needsUpdate=true; tl.mesh.geometry.computeVertexNormals(); tl.mesh.geometry.computeBoundingSphere();
+}
+function ringRescale(){ RING.tiles.forEach(ringScaleTile); }
+
+// ================= Etkin pencereyi kaydırma =================
+function shiftTick(){
+  const bt=$("shiftBtn"); if(!S.loaded||!REG){ bt.hidden=true; return; }
+  if(shiftBusy) return;
+  const t=controls.target, e=Math.max(Math.abs(t.x),Math.abs(t.z))/SIZE;
+  bt.hidden = e<0.35; // kenara %15 kala
+}
+function shiftProg(f){
+  const bt=$("shiftBtn");
+  if(f<0){ shiftBusy=false; bt.disabled=false; bt.textContent="Yüklenemedi · tekrar dene"; return; }
+  bt.textContent=`Yükleniyor… %${Math.round(f*100)}`;
+}
+async function shiftHere(){
+  if(shiftBusy||!S.loaded) return;
+  const f=SIZE/(N-1), t=controls.target, sx=Math.round(t.x/f), sy=Math.round(t.z/f);
+  if(!sx&&!sy) return;
+  shiftBusy=true; $("shiftBtn").disabled=true; shiftProg(0);
+  await loadRegion({sx,sy});
+  if(shiftBusy){ shiftBusy=false; const bt=$("shiftBtn"); bt.disabled=false; bt.textContent="Bu bölgeye geç →"; bt.hidden=true; }
+}
+
+function buildScene(keepCam){
   [terrainMesh,waterMesh,dereMesh].forEach(m=>{ if(m){scene.remove(m);} });
   if(terrainMesh) terrainMesh.geometry.dispose();
   if(waterMesh) waterMesh.geometry.dispose();
   const tg=new THREE.PlaneGeometry(SIZE,SIZE,N-1,N-1);
+  // köşe x, zd pikselinde 2x+1'de: doku [0,512] aralığını kaplar (çevre bloklarıyla aynı hizada)
+  { const uv=tg.attributes.uv; for(let i=0;i<N*N;i++){ const x=i%N, y=(i-x)/N; uv.setXY(i,(2*x+1)/512,1-(2*y+1)/512); } }
   terrainMesh=new THREE.Mesh(tg,new THREE.MeshLambertMaterial({color:0xffffff}));
   terrainMesh.rotation.x=-Math.PI/2; scene.add(terrainMesh);
   applyTexture();
@@ -1048,14 +1210,14 @@ function buildScene(){
   waterMesh.rotation.x=-Math.PI/2; waterMesh.renderOrder=1; scene.add(waterMesh);
   seaMesh.visible = sea.some(v=>v); updateSeaMask();
   rebuildTerrainZ(); drawDereOverlay();
-  controls.target.set(0,0,0); camera.position.set(0,140,180);
+  if(!keepCam){ controls.target.set(0,0,0); camera.position.set(0,140,180); }
 }
 function rebuildTerrainZ(){
   const p=terrainMesh.geometry.attributes.position, k=sc()*S.ex;
   for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k); // deniz tabanı sığ: duvar oluşmasın
   p.needsUpdate=true; terrainMesh.geometry.computeVertexNormals();
   if(bldMesh) bldMesh.scale.y=k;
-  updateWaterMesh();
+  updateWaterMesh(); ringRescale();
 }
 async function applyTexture(){
   if(!terrainMesh) return;
@@ -1289,7 +1451,7 @@ function showTip(){
   const hit=ray.intersectObject(terrainMesh)[0];
   const tip=$("tip");
   if(!hit){hideTip();return;}
-  const gx=hit.uv.x*(N-1), gy=(1-hit.uv.y)*(N-1), x=Math.round(gx), y=Math.round(gy), i=y*N+x;
+  const gx=(hit.uv.x*512-1)/2, gy=((1-hit.uv.y)*512-1)/2, x=Math.round(gx), y=Math.round(gy), i=y*N+x;
   let near="";
   if(DERE){
     let best=1.2;
@@ -1319,12 +1481,13 @@ function loop(now){
     controls.target.lerpVectors(fly.fromT,fly.toT,e); camera.position.lerpVectors(fly.fromP,fly.toP,e);
     if(fly.t>=1) fly=null;
   }
-  const lim=SIZE*0.6, tg=controls.target;
+  const lim=SIZE*(RING.on?RING.R+0.3:0.6), tg=controls.target;
   if(Math.abs(tg.x)>lim||Math.abs(tg.z)>lim){ const ox=tg.x, oz=tg.z; tg.x=Math.max(-lim,Math.min(lim,tg.x)); tg.z=Math.max(-lim,Math.min(lim,tg.z)); camera.position.x+=tg.x-ox; camera.position.z+=tg.z-oz; }
+  { const cd=camDist(); scene.fog.near=cd+120; scene.fog.far=cd+(RING.on?SIZE*(RING.R+0.5):380); } // çevre blokları uzaktan da görünsün
   updateSea(now/1000);
   updateRain(rdt);
   updateFlow(rdt);
-  bldAcc+=rdt; if(bldAcc>0.5){ bldAcc=0; bldTick(); }
+  bldAcc+=rdt; if(bldAcc>0.5){ bldAcc=0; bldTick(); ringTick(); shiftTick(); }
   controls.update();
   updateLabels();
   renderer.render(scene,camera);
@@ -1338,6 +1501,8 @@ function setView(polar,az,dist,target){
   const p=new THREE.Vector3().setFromSphericalCoords(dist,polar,az).add(t);
   fly={t:0,fromT:controls.target.clone(),toT:t,fromP:camera.position.clone(),toP:p};
 }
+$("shiftBtn").onclick=shiftHere;
+$("ringOn").onchange=e=>{ RING.on=e.target.checked; ringTick(); };
 $("nNorth").onclick=()=>setView(controls.getPolarAngle(),0,camDist());
 $("nIn").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.max(6,camDist()*0.6));
 $("nOut").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.min(500,camDist()*1.6));
