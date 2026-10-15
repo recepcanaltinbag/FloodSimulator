@@ -360,12 +360,19 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="ctrl">
     <label>Zemin (suyu emme)</label>
     <select id="soil">
-      <option value="2">Beton / asfalt (yoğun kentsel) · 2 mm/sa</option>
-      <option value="8" selected>Karışık kentsel · 8 mm/sa</option>
-      <option value="25">Toprak / orman · 25 mm/sa</option>
-      <option value="80">Karstik kireçtaşı · 80 mm/sa</option>
+      <option value="2">Beton / asfalt (yoğun kentsel) · 6 → 1 mm/sa</option>
+      <option value="8" selected>Karışık kentsel · 30 → 3 mm/sa</option>
+      <option value="25">Toprak / orman · 75 → 10 mm/sa</option>
+      <option value="80">Karstik kireçtaşı · 150 → 60 mm/sa</option>
       <option value="0">Hiç emmesin (en kötü durum)</option>
     </select>
+    <label style="margin-top:8px">Önceki günler</label>
+    <select id="ante">
+      <option value="dry" selected>Kuru · zemin suyu iyi emer</option>
+      <option value="wet">Nemli · son günlerde yağmur yağdı</option>
+      <option value="sat">Doygun · uzun süredir yağıyor</option>
+    </select>
+    <p class="sub" id="soilInfo" style="margin-top:4px"></p>
   </div>
   <h2>Kanalizasyon / yağmur suyu sistemi</h2>
   <div class="ctrl">
@@ -549,7 +556,13 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:8, speed:60, ex:1.5,
+// Zemin sızması (Horton): f = fc + (f0 − fc)·e^(−x). x zemin ıslandıkça büyür; yağış kapasiteyi aştığında k (1/sa) hızla,
+// daha zayıf yağışta yağış/kapasite oranında (zaman sıkıştırma yaklaşımı). Seçim değeri (2/8/25/80/0) zemin sınıfının anahtarı.
+// Kaba değerler: kentsel alanda geçirimsiz yüzey payı hesaba katılarak (Akan 1993; Rawls vd. 1983 aralıklarından).
+const SOILS = {"0":{f0:0,fc:0,k:2}, "2":{f0:6,fc:1,k:4}, "8":{f0:30,fc:3,k:2}, "25":{f0:75,fc:10,k:2}, "80":{f0:150,fc:60,k:1}};
+const ANTE = {dry:0, wet:1, sat:3};   // başlangıç ıslaklığı (x): kuru, nemli (kapasite ~%37'ye inmiş), doygun (~%5)
+const infCap = () => S.soil.fc + (S.soil.f0 - S.soil.fc)*Math.exp(-S.wetX);
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:30, soil:SOILS["8"], soilV:"8", ante:0, wetX:0, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -707,7 +720,10 @@ SCEN.forEach(s=>{
 });
 $("scen").append(scenXb, scenX);
 function uiUpd(){
-  S.rate=+$("rate").value; S.durH=+$("dur").value; S.inf=+$("soil").value;
+  S.rate=+$("rate").value; S.durH=+$("dur").value;
+  S.soilV=$("soil").value; S.soil=SOILS[S.soilV]||SOILS["8"]; S.ante=ANTE[$("ante").value]||0;
+  if(S.simT===0) S.wetX=S.ante;   // yağış başladıktan sonra zemin seçimi değişirse ıslaklık korunur
+  S.inf=infCap(); soilUI();
   const sp=SPEEDS[+$("spd").value]; S.speed=sp.v;
   $("rateV").textContent=S.rate+" mm/saat"; $("durV").textContent=S.durH+" saat → "+fmt(S.rate*S.durH)+" mm";
   $("spdV").textContent=sp.t;
@@ -718,7 +734,12 @@ function uiUpd(){
   const ex=+$("ex").value; $("exV").textContent=ex+"×";
   if (ex!==S.ex){ S.ex=ex; if (S.loaded) rebuildTerrainZ(); }
 }
-["rate","dur","soil","spd","ex","sewer","blk"].forEach(id=>$(id).oninput=uiUpd); uiUpd();
+function soilUI(){
+  const p=S.soil, el=$("soilInfo"); if(!el) return;
+  el.textContent = p.f0<=0 ? "Zemin hiç su emmez; yağışın tamamı akışa geçer." :
+    `Zemin şu an saatte ${fmt(S.inf,1)} mm emiyor. Kuruyken ${p.f0} mm/sa emer, ıslandıkça ${p.fc} mm/sa'e iner (Horton). Yukarı havzaya da aynısı uygulanır.`;
+}
+["rate","dur","soil","ante","spd","ex","sewer","blk"].forEach(id=>$(id).oninput=uiUpd); uiUpd();
 $("tex").onchange=applyTexture;
 $("play").onclick=()=>{ S.running=!S.running; updPlay(); };
 $("reset").onclick=()=>{ resetWater(); S.running=S.loaded; updPlay(); }; // baştan başlat, yağmur hemen yeniden yağar
@@ -1671,7 +1692,7 @@ function resetWater(){
   d=new Float32Array(N*N); H=new Float32Array(N*N);
   fL=new Float32Array(N*N); fR=new Float32Array(N*N); fT=new Float32Array(N*N); fB=new Float32Array(N*N);
   for(let i=0;i<N*N;i++) if(sea[i]) d[i]=-b[i];
-  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.under=0; S.underP=0; S.running=false; upReset(); updPlay(); updStats();
+  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.under=0; S.underP=0; S.running=false; S.wetX=S.ante; S.inf=infCap(); upReset(); updPlay(); updStats();
   if(waterMesh){ updateWaterMesh(); drawDereOverlay(); }
 }
 function simStep(dt){
@@ -1700,6 +1721,8 @@ function simStep(dt){
   const raining = S.simT < S.durH*3600;
   // binalar engelse çatıya düşen yağmur oluklardan sokağa iner: açık hücrelere paylaştır
   const rain = raining ? S.rate/1000/3600*dt*(O?OBSK:1) : 0;
+  // zemin ıslandıkça sızma kapasitesi düşer (Horton); yukarı havza da bir sonraki dakikada bu değeri kullanır
+  if(S.inf>0){ S.wetX += S.soil.k*dt/3600*Math.min(1,(raining?S.rate:0)/S.inf); S.inf=infCap(); }
   const inf = S.inf/1000/3600*dt;
   const sw=S.sewer, toM=dt/1000/3600;
   const outStep=sw.out*toM, storeM=sw.store/1000;
@@ -2212,6 +2235,7 @@ function drawPonors(g,f){
 // ================= İstatistik =================
 let landWetFrac=0;
 function updStats(){
+  if(typeof soilUI==="function") soilUI();
   if(!d) return;
   let area=0,mx=0,vol=0; const cA=S.cell*S.cell;
   for(let i=0;i<N*N;i++){ if(sea[i])continue; const w=d[i]; if(w>0.1)area++; if(w>mx)mx=w; vol+=w*cA; }

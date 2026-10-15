@@ -12,7 +12,7 @@ Kurulum gerekmez; tek bir HTML sayfası ve yardımcı betiklerden oluşur, telef
 
 - **Bölge seçimi:** Haritadan herhangi bir yer ya da hazır İstanbul dereleri (Kağıthane, Ayamama, Kurbağalıdere, Alibeyköy, Haliç, Haramidere, Sarıyer, Riva); il/ilçe araması, karst alanları ve dağlar. Kamerayı kaydırınca simülasyon alanı da taşınır, su korunur.
 - **Yağış senaryoları:** gerçek ölçümlere dayalı hazır senaryolar, saat saat değişen gerçek yağış, önümüzdeki 3 günün tahmini (hata payıyla) ve gizli bir "aşırı senaryolar" bölümü.
-- **Kanalizasyon ve zemin:** şebeke kapasitesi, ızgara tıkanıklığı, zeminin suyu emme hızı; karst modu (düdenler) ve kapalı çukurların yeraltına boşalması.
+- **Kanalizasyon ve zemin:** şebeke kapasitesi, ızgara tıkanıklığı, zeminin suyu emme hızı (zemin ıslandıkça azalır) ve önceki günlerin yağışı (kuru / nemli / doygun); karst modu (düdenler) ve kapalı çukurların yeraltına boşalması.
 - **Dereler:** OpenStreetMap dereleri araziye işlenir (köprü ve viyadükler akışı kesmez). "Dere" adlı yollarda akış istatistiği ve olası eski dere yatakları gösterilir.
 - **Havzadan gelen su:** simülasyon alanının dışındaki yukarı havzaya düşen yağış, dere yataklarından gecikmeli olarak alana girer.
 - **Drenaj alanı aracı:** bir noktaya sağ tıklayınca o noktanın drenaj alanı, toplanma süresi ve farklı yağışlarda gelebilecek debi (Rasyonel Yöntem).
@@ -41,7 +41,7 @@ Kurulum gerekmez; tek bir HTML sayfası ve yardımcı betiklerden oluşur, telef
 ## Nasıl çalışır
 
 - **Akış:** 2B sığ su yaklaşımı ("sanal borular" yöntemi) ve Manning sürtünmesi; 256 × 256 hücrelik pencere (orta boy bölgede hücre ≈ 29 m). LISFLOOD-FP gibi bilimsel modellerin sadeleştirilmiş bir akrabasıdır.
-- **Kayıplar:** zemin sızması (sabit hız), kanalizasyon (toplu kapasite: ızgara çekişi + boru hacmi + deşarj), karst düdenleri ve kapalı çukur yutakları.
+- **Kayıplar:** zemin sızması (Horton: zemin ıslandıkça azalır; önceki günlerin yağışı seçilebilir, yukarı havzaya da uygulanır), kanalizasyon (toplu kapasite: ızgara çekişi + boru hacmi + deşarj), karst düdenleri ve kapalı çukur yutakları.
 - **Dereler:** OSM dere hatları boyunca arazi alçaltılır (stream burning); köprü tablaları yalnızca görüntüde kalır.
 - **Yukarı havza:** pencere dışında ~115 m'lik kaba arazi üzerinde D8 akış yönleri ve priority-flood; su, yamaçta ~0,5, derede ~1,5 m/s varsayımıyla gecikmeli girer.
 - **Drenaj alanı:** Rasyonel Yöntem (Q = C·i·A/3,6) ve Kirpich toplanma süresi.
@@ -60,7 +60,7 @@ Model, 14 Ekim 2026 selinde haberlerde ve resmî açıklamalarda geçen 74 su ba
 
 - **Yükseklik verisi kaba:** 30 m çözünürlük, birkaç metre dikey hata; binalar, alt geçitler, duvarlar, bordürler ve menfezler yok. Su derinliği bu hatalardan daha küçük olduğu için en büyük belirsizlik kaynağıdır.
 - **Kanalizasyon tek bir kapasiteyle** temsil edilir; gerçek boru ağı ve geri tepme yoktur.
-- **Zemin emmesi sabittir;** ıslandıkça azalma ve önceki günlerin yağışı hesaba katılmaz.
+- **Zemin emmesi tek bir Horton eğrisiyle** temsil edilir: pencere boyunca aynı zemin türü ve ıslaklık varsayılır; zemin haritası kullanılmaz.
 - **Yağış pencere boyunca her yere eşit** düşer; gerçek sağanaklar birkaç km'lik hücrelerle gelir.
 - Derinlikler belirli bir noktada iki kat fazla ya da az çıkabilir. Senaryoları **birbirleriyle karşılaştırmak** tek bir sonuca güvenmekten daha sağlıklıdır.
 

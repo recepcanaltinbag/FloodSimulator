@@ -29,7 +29,7 @@
   // akış katsayısı (C): zemin seçimine göre; karst modunda çok düşük
   function runoffC(){
     if(typeof KARST !== "undefined" && KARST.on) return {c:0.15, t:"karstik kireçtaşı"};
-    const inf = S.inf;
+    const inf = +(S.soilV ?? S.inf);        // zemin sınıfı (seçim değeri); anlık sızma Horton'la değişir
     if(inf <= 0) return {c:0.95, t:"hiç emmeyen zemin"};
     if(inf <= 2) return {c:0.85, t:"beton / asfalt"};
     if(inf <= 8) return {c:0.6, t:"karışık kentsel"};
