@@ -16,8 +16,7 @@
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button{font:inherit}
-.wrap{display:grid;grid-template-columns:330px 1fr;height:100vh}
-@media (max-width:900px){.wrap{grid-template-columns:1fr;height:auto}}
+.wrap{display:grid;grid-template-columns:330px minmax(0,1fr);height:100vh}
 aside{background:var(--panel);border-right:1px solid var(--line);padding:14px 16px;overflow-y:auto}
 h1{font-size:18px;margin:0 0 2px}
 .sub{color:var(--muted);font-size:12px;margin:0}
@@ -42,14 +41,13 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .btn.ghost{background:var(--accent-soft);color:var(--accent)}
 .btn.sm{padding:6px 10px;font-size:12px}
 .btn:disabled{opacity:.45;cursor:default}
-.main{position:relative;display:flex;flex-direction:column;min-height:0}
-#view{flex:1;min-height:440px;position:relative;overflow:hidden}
+.main{position:relative;display:flex;flex-direction:column;min-height:0;min-width:0}
+#view{flex:1;min-height:440px;position:relative;overflow:hidden;touch-action:none}
 #view canvas{display:block}
 .overlay{position:absolute;inset:0;display:none;flex-direction:column;gap:10px;align-items:center;justify-content:center;background:rgba(11,15,21,.8);font-size:15px;z-index:5}
 .progress{width:260px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
 .progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
-.hud{position:absolute;left:12px;top:12px;background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;backdrop-filter:blur(6px);max-width:calc(100% - 320px)}
-@media (max-width:700px){.hud{max-width:none;right:12px}}
+.hud{position:absolute;left:12px;top:12px;background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;backdrop-filter:blur(6px);max-width:calc(100% - 290px)}
 .hud b{font-size:15px}
 .legend{position:absolute;left:12px;bottom:12px;background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:11px;backdrop-filter:blur(6px)}
 .legend .bar{width:150px;height:9px;border-radius:4px;background:linear-gradient(90deg,rgb(150,210,255),rgb(60,140,240),rgb(10,40,140));margin:4px 0}
@@ -59,14 +57,18 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 #tip{position:absolute;pointer-events:none;background:rgba(0,0,0,.82);border-radius:6px;padding:5px 8px;font-size:12px;white-space:nowrap;z-index:4;opacity:0;visibility:hidden}
 #tip.on{opacity:1;visibility:visible;transition:opacity .15s}
 .nav{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:3}
-.nav button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:rgba(11,15,21,.8);color:var(--ink);font-size:17px;cursor:pointer;backdrop-filter:blur(6px)}
+.nav button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:rgba(11,15,21,.8);color:var(--ink);font-size:17px;cursor:pointer;backdrop-filter:blur(6px)}
 .nav button:hover{border-color:var(--accent)}
 .help{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(11,15,21,.72);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:11.5px;color:var(--muted);white-space:nowrap;pointer-events:none}
-@media (max-width:1100px){.help{display:none}}
-.panel{position:absolute;right:12px;top:12px;width:290px;max-height:calc(100% - 24px);overflow-y:auto;background:rgba(11,15,21,.8);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;backdrop-filter:blur(6px);z-index:3}
-@media (max-width:700px){.panel{position:static;width:auto;margin:8px}}
-.panel .ph{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;margin-bottom:6px}
-.panel .ph small{font-weight:400;color:var(--muted)}
+@media (max-width:1100px),(hover:none){.help{display:none}}
+.panel{position:absolute;right:12px;top:12px;width:250px;max-height:45%;overflow-y:auto;background:rgba(11,15,21,.8);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:12px;backdrop-filter:blur(6px);z-index:3}
+.panel.collapsed{width:auto;max-width:250px;border-radius:999px;padding:6px 12px}
+.panel.collapsed .pbody{display:none}
+.panel .ph{display:flex;width:100%;gap:8px;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;border:0;background:none;color:var(--ink);padding:0;cursor:pointer;text-align:left}
+.panel:not(.collapsed) .ph{margin-bottom:6px}
+.panel .ph small{font-weight:400;color:var(--muted);margin-left:6px}
+.panel .ph i{font-style:normal;color:var(--muted);transition:transform .2s}
+.panel:not(.collapsed) .ph i{transform:rotate(90deg)}
 .panel label{display:flex;gap:6px;align-items:center;margin:3px 0;cursor:pointer}
 .compare{margin:8px 0;display:grid;gap:6px}
 .cmp .t{display:flex;justify-content:space-between}
@@ -94,6 +96,23 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .lb.c-suburb::after,.lb.c-road::after{display:none}
 .lb.c-road{font-style:italic;color:#ffe9a8;font-weight:500}
 .note{font-size:11px;color:var(--muted);margin-top:14px}
+/* ===== Telefon / dar ekran: üst çubuk → 3B görünüm → istatistikler → ayarlar ===== */
+@media (max-width:900px){
+  .wrap{display:flex;flex-direction:column;height:auto}
+  aside{display:contents}
+  aside .top{order:0;background:var(--panel);padding:10px 16px 8px;border-bottom:1px solid var(--line)}
+  aside .top h1{font-size:16px}
+  aside .top .sub{display:none}
+  aside .top #liveSt{margin-bottom:6px!important}
+  aside .top .region{margin-top:4px;padding:6px 10px}
+  .main{order:1}
+  aside .settings{order:2;background:var(--panel);padding:4px 16px 20px}
+  #view{flex:none;height:65vh;min-height:300px}
+  .main .panel{position:static;order:1;width:auto;max-width:none;max-height:none;margin:8px 12px 0;border-radius:12px;backdrop-filter:none}
+  .main .stats{order:2}
+  .hud{max-width:calc(100% - 24px)}
+  .legend{transform:scale(.85);transform-origin:left bottom}
+}
 
 /* ===== Bölge seçim ekranı ===== */
 #picker{position:fixed;inset:0;z-index:50;background:rgba(5,8,12,.82);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -170,6 +189,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
 <div class="wrap">
 <aside>
+<div class="top">
   <h1>🌧️ İstanbul Sel Simülasyonu</h1>
   <p class="sub">Uydu yükseklik verisi (SRTM tabanlı DEM) üzerinde yağmur suyunun akışı ve birikmesi.</p>
 
@@ -184,6 +204,8 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <div><b id="regName">—</b><small id="regInfo"></small></div>
     <button class="btn ghost sm" id="openPicker">Değiştir</button>
   </div>
+</div>
+<div class="settings">
 
   <h2>Yağış senaryosu</h2>
   <div class="chips" id="scen" style="margin-bottom:10px"></div>
@@ -251,18 +273,13 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
     Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim
   </p>
+</div>
 </aside>
 
 <div class="main">
   <div id="view">
     <div class="overlay" id="overlay"><div id="ovText">Bir bölge seç.</div><div class="progress"><i id="ovBar"></i></div></div>
     <div class="hud" id="hud">—</div>
-    <div class="panel" id="derePanel">
-      <div class="ph">📊 Dere izleri <small>OpenStreetMap</small></div>
-      <label><input type="checkbox" id="showRoads" checked> <span class="sw" style="background:var(--amber)"></span> Adında "dere" geçen yollar</label>
-      <label><input type="checkbox" id="showWater" checked> <span class="sw" style="background:var(--cyan)"></span> Dereler / kanallar</label>
-      <div id="dereBody" class="muted" style="margin-top:6px">Bölge yüklenince gösterilecek.</div>
-    </div>
     <div class="legend">
       <div>Su derinliği</div><div class="bar"></div><div class="ticks"><span>5 cm</span><span>1 m</span><span>3 m+</span></div>
       <div class="row"><span class="sw" style="background:var(--amber)"></span>"Dere" adlı yol (kuru)</div>
@@ -279,6 +296,15 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <button id="nHome" title="Başa dön">⌂</button>
     </div>
     <div class="help">Sol tık: kaydır · Sağ tık veya Ctrl+sürükle: döndür / eğ · Tekerlek: yakınlaş · Çift tık: oraya uç</div>
+  </div>
+  <div class="panel collapsed" id="derePanel">
+    <button class="ph" id="dereToggle" aria-expanded="false"><span>📊 Dere izleri<small id="dereSum"></small></span><i>▸</i></button>
+    <div class="pbody">
+      <label><input type="checkbox" id="showRoads" checked> <span class="sw" style="background:var(--amber)"></span> Adında "dere" geçen yollar</label>
+      <label><input type="checkbox" id="showWater" checked> <span class="sw" style="background:var(--cyan)"></span> Dereler / kanallar</label>
+      <div id="dereBody" class="muted" style="margin-top:6px">Bölge yüklenince gösterilecek.</div>
+      <div class="muted" style="font-size:10.5px;margin-top:6px">Kaynak: OpenStreetMap</div>
+    </div>
   </div>
   <div class="stats">
     <div class="stat"><div class="k">Geçen süre</div><div class="v" id="sT">0 dk</div></div>
@@ -446,6 +472,14 @@ $("tex").onchange=applyTexture;
 $("play").onclick=()=>{ S.running=!S.running; updPlay(); };
 $("reset").onclick=()=>resetWater();
 $("showRoads").onchange=$("showWater").onchange=()=>drawDereOverlay();
+// Dere paneli: varsayılan kapalı (hap); masaüstünde son durum hatırlanır, telefonda hep kapalı başlar
+const MOBILE=matchMedia("(max-width:900px), (hover:none)").matches;
+function setDerePanel(open){
+  $("derePanel").classList.toggle("collapsed",!open); $("dereToggle").setAttribute("aria-expanded",open);
+  try{ localStorage.setItem("derePanelOpen",open?"1":"0"); }catch(e){}
+}
+{ let open=false; try{ open=!MOBILE && localStorage.getItem("derePanelOpen")==="1"; }catch(e){} setDerePanel(open); }
+$("dereToggle").onclick=()=>setDerePanel($("derePanel").classList.contains("collapsed"));
 function updPlay(){ $("play").textContent=S.running?"⏸ Duraklat":(S.simT>0?"▶ Devam":"▶ Yağmuru başlat"); if(d) updStats(); }
 
 // ================= Veri yükleme =================
@@ -496,7 +530,7 @@ async function loadRegion(){
     S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
     elevCanvas=makeElevCanvas();
 
-    const q=Math.min(S.q, Math.log2(maxTex/512));
+    const q=Math.min(S.q, MOBILE?2:3, Math.log2(maxTex/512)); // telefonda bellek için en fazla 2048 px
     const zs=zd+q, sz=512*2**q, k=2**q;
     roadCanvas=null; blendCanvas=null;
     try{
@@ -907,6 +941,8 @@ const controls=new THREE.MapControls(camera,renderer.domElement);
 controls.enableDamping=true; controls.dampingFactor=0.08; controls.screenSpacePanning=false;
 controls.maxPolarAngle=Math.PI*0.47; controls.minDistance=6; controls.maxDistance=500;
 controls.zoomSpeed=1.2; controls.rotateSpeed=0.6;
+renderer.domElement.style.touchAction="none";
+controls.touches={ONE:THREE.TOUCH.PAN, TWO:THREE.TOUCH.DOLLY_ROTATE};
 let fly=null;
 function flyTo(target,dist){
   const dir=camera.position.clone().sub(controls.target).normalize();
@@ -1077,6 +1113,7 @@ function updDereStats(){
   const ratio = lf>0.0005 ? fr/lf : 0;
   const top=names.filter(o=>o.max>0.05).sort((a,b)=>b.max-a.max).slice(0,6);
   const pct=x=>"%"+fmt(x*100,x<0.1?1:0);
+  $("dereSum").textContent=` · ${pct(fr)} su altında`;
   $("dereBody").innerHTML = `
     <div><b>${names.length}</b> farklı isim · <b>${fmt(km/1000,1)} km</b> yol · <b>${DERE.ways.length}</b> dere/kanal parçası</div>
     <div class="compare">
@@ -1164,14 +1201,26 @@ function updateFlow(rdt){
 // imleç ~600 ms aynı yerde durunca göster (sürekli açılıp kapanmasın, her harekette ışın atılmasın)
 let tipTimer=0, tipAt=null;
 function hideTip(){ clearTimeout(tipTimer); tipTimer=0; $("tip").classList.remove("on"); }
+let touchMode=false, lpTimer=0, lpAt=null;
 renderer.domElement.addEventListener("mousemove",e=>{
-  if(!terrainMesh) return;
+  if(!terrainMesh||touchMode) return;
   if(tipAt && Math.hypot(e.clientX-tipAt.x,e.clientY-tipAt.y)<=4 && (tipTimer||$("tip").classList.contains("on"))) return;
   hideTip(); tipAt={x:e.clientX,y:e.clientY};
   if(e.buttons||fly) return;
   tipTimer=setTimeout(showTip,600);
 });
 ["pointerdown","wheel","mouseleave"].forEach(ev=>renderer.domElement.addEventListener(ev,()=>{ hideTip(); tipAt=null; },{passive:true}));
+// dokunmatik: ~500 ms kıpırdamadan basılı tutunca göster
+renderer.domElement.addEventListener("pointerdown",e=>{
+  touchMode=e.pointerType!=="mouse"; if(!touchMode) return;
+  clearTimeout(lpTimer); lpAt={x:e.clientX,y:e.clientY};
+  lpTimer=setTimeout(()=>{ lpTimer=0; tipAt=lpAt; showTip(); },500);
+});
+renderer.domElement.addEventListener("pointermove",e=>{
+  if(e.pointerType==="mouse"){ touchMode=false; return; }
+  if(lpTimer && Math.hypot(e.clientX-lpAt.x,e.clientY-lpAt.y)>8){ clearTimeout(lpTimer); lpTimer=0; }
+});
+["pointerup","pointercancel"].forEach(ev=>renderer.domElement.addEventListener(ev,()=>{ clearTimeout(lpTimer); lpTimer=0; }));
 function showTip(){
   tipTimer=0;
   if(!terrainMesh||!tipAt||fly) return;
