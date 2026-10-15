@@ -1908,7 +1908,7 @@ const flowGeo=new THREE.BufferGeometry();
 flowGeo.setAttribute("position",new THREE.BufferAttribute(flowPos,3));
 flowGeo.setAttribute("color",new THREE.BufferAttribute(flowCol,3));
 const flowLines=new THREE.LineSegments(flowGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false}));
-flowLines.renderOrder=3; flowLines.frustumCulled=false; scene.add(flowLines);
+flowLines.renderOrder=6; flowLines.frustumCulled=false; scene.add(flowLines); // su, dere çizgileri ve binalardan sonra çizilir
 for(let i=0;i<FP;i++){ fx[i]=-1; fa[i]=Math.random()*3; }
 function cellVel(i,x){
   const w=d[i]; if(w<0.0005||sea[i]) return null; // 0,5 mm'den itibaren; ama 4 mm'nin altında yalnızca toplanmış akış yollarında (aşağıda)
@@ -1941,7 +1941,9 @@ function updateFlow(rdt){
     const ox=fx[p], oy=fy[p];
     fx[p]+=v[0]/sp*g; fy[p]+=v[1]/sp*g;
     const tail=Math.min(2.5,0.4+sp*1.5);
-    const h=(b[i]+d[i])*k+0.12;
+    // su yüzeyinin ve çizilen zeminin (köprü düzeltmesinde görüntü farklı olabilir) biraz üstünde: öne çıksın
+    const vz=(window.BURN&&BURN.on&&BURN.visual&&BURN.visual.length===b.length)?BURN.visual[i]:b[i];
+    const h=Math.max(b[i]+d[i],vz)*k+0.35;
     const o=p*6;
     flowPos[o]=(ox-v[0]/sp*tail)*f-half; flowPos[o+1]=h; flowPos[o+2]=(oy-v[1]/sp*tail)*f-half;
     flowPos[o+3]=fx[p]*f-half; flowPos[o+4]=h; flowPos[o+5]=fy[p]*f-half;
