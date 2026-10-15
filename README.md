@@ -98,3 +98,11 @@ Ardından tarayıcıda `http://localhost:8765/` adresini açın. Derleme adımı
 - Yağış: [Open-Meteo](https://open-meteo.com/) (ECMWF topluluk tahmini dahil); ölçümler İBB AKOM ve MGM açıklamalarından
 - İl/ilçe merkezleri: OSM (Nominatim) + geoBoundaries ADM2; dağ zirveleri: Wikidata/OSM
 - Kütüphaneler: [Three.js](https://threejs.org/) r128, [Leaflet](https://leafletjs.com/), geotiff.js, proj4js
+
+## Lisans
+
+- **Kod:** [MIT](LICENSE).
+- **`dem/fabdem/` karoları:** FABDEM'den türetilmiştir, **CC BY-NC-SA 4.0** (ticari olmayan kullanım, aynı lisansla paylaşım). MIT lisansının kapsamında değildir.
+- **`data/istanbul_osm.json` ve `data/osm_area/`:** OpenStreetMap verisinden türetilmiştir, © OpenStreetMap katkıcıları, **ODbL 1.0**.
+- **`data/tr_*.js`:** OSM/Nominatim, geoBoundaries, Wikidata ve Wikipedia'dan derlenmiş yer listeleri; kaynakların kendi koşulları geçerlidir.
+- Uydu görüntüleri, yükseklik ve yağış servisleri kendi kullanım koşullarına tabidir (bkz. [Veri ve künye](#veri-ve-künye)).
