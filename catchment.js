@@ -7,7 +7,7 @@
   const CA = window.CATCH = {cells:null, pour:-1, key:null, info:null, open:false};
   const css = document.createElement("style");
   css.textContent = `
-    #catchBox{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;width:min(380px,calc(100% - 24px));max-height:70%;overflow:auto;
+    #catchBox{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:6;width:min(360px,calc(100% - 24px));max-height:70%;overflow:auto;
       background:rgba(17,22,30,.96);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
     #catchBox[hidden]{display:none}
     #catchBox .x{float:right;border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer}
@@ -20,7 +20,9 @@
     #catchBox .sum{cursor:pointer;font-weight:700;font-size:13.5px;padding-right:22px}
     #catchBox .sum small{font-weight:500;color:var(--muted)}
     #catchBox .more[hidden]{display:none}
-    #catchBox.compact{padding:8px 12px}`;
+    #catchBox.compact{padding:8px 12px}
+    #catchBox.at{transform:none}
+    #catchBox .zoom{border:1px solid var(--line);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer;margin-top:6px}`;
   document.head.appendChild(css);
   const box = document.createElement("div"); box.id = "catchBox"; box.hidden = true;
   (document.getElementById("view") || document.body).appendChild(box);
@@ -54,7 +56,7 @@
     return {inC, count:q.length, far, L:dist[far], list:q};
   }
 
-  function show(gx, gy){
+  function show(gx, gy, pos){
     const LC = window.LOSTCREEK;
     if(!LC || !LC.down || !LC.acc){ alert("Akış yönleri henüz hesaplanmadı; bölge yüklendikten birkaç saniye sonra tekrar dene."); return; }
     let x = Math.round(gx), y = Math.round(gy);
@@ -66,9 +68,9 @@
     const U = upstream(pour), H = (window.BURN && BURN.vis && BURN.vis.length===b.length) ? BURN.vis : b;
     const Ain = U.count*S.cell*S.cell;
     // pencere dışındaki yukarı havza: kenardan bu havzaya giren girişlerin alanı (havza girişi analizi, ~115 m)
-    let Aext = 0, nIn = 0;
+    let Aext = 0, nIn = 0; const inflows = [];
     if(typeof UP !== "undefined" && UP.on && UP.R && UP.R.cls)
-      for(const q of UP.R.cls){ if(q && q.cells && q.cells.some(c => U.inC[c])){ Aext += q.area; nIn++; } }
+      for(const q of UP.R.cls){ if(q && q.cells && q.cells.some(c => U.inC[c])){ Aext += q.area; nIn++; inflows.push({i:q.i, side:q.side, area:q.area}); } }
     const A = Ain + Aext, Akm2 = A/1e6;
     const fmtA = a => a<1e6 ? fmt(a/1e4,1)+" ha" : fmt(a/1e6,2)+" km²";
     const drop = Math.max(0.5, H[U.far] - H[pour]), slope = Math.max(0.002, drop/Math.max(U.L, S.cell));
@@ -78,12 +80,16 @@
     const rates = [20, 50, 80, 100]; if(!rates.includes(S.rate)) rates.push(S.rate); rates.sort((a,c)=>a-c);
     const rows = rates.map(i => { const Q = C.c*i*Akm2/3.6, V = C.c*i/1000*A; return `<tr class="${i===S.rate?"cur":""}"><td>${i} mm/sa${i===S.rate?" (şimdiki)":""}</td><td>${fmt(Q, Q<10?2:0)} m³/sn</td><td>${V>1e6?fmt(V/1e6,2)+" milyon":fmt(V)} m³</td></tr>`; }).join("");
     const p = (typeof px2ll==="function") ? px2ll(REG.x0+2*(pour%N)+1, REG.y0+2*Math.floor(pour/N)+1, REG.n) : null;
-    CA.cells = U.inC; CA.pour = pour; CA.key = LC.down;
+    CA.cells = U.inC; CA.pour = pour; CA.key = LC.down; CA.inflows = inflows;
+    // dış havza büyükse "Yukarı havza" katmanını aç (çevrede dış havza sınırları ve dereler görünsün)
+    const su = document.getElementById("showUp");
+    if(Aext > 0 && su && !su.checked){ su.checked = true; su.dispatchEvent(new Event("change")); }
     const Qnow = C.c*S.rate*Akm2/3.6;
     box.className = CA.open ? "" : "compact";
     box.innerHTML = `<button class="x" title="Kapat">✕</button>
       <div class="sum">💧 ${fmtA(A)}${Aext>0?` <small>(dışarıdan +${fmtA(Aext)})</small>`:""} · ~${fmt(tc)} dk · <span style="color:var(--accent)">${S.rate} mm/sa'te ${fmt(Qnow, Qnow<10?2:0)} m³/sn</span>
         <small>${CA.open?"▴ gizle":"▾ ayrıntı"}</small></div>
+      <button class="zoom" title="Kamerayı havzanın tamamına uçur">🔍 Havzayı göster</button>
       <div class="more" ${CA.open?"":"hidden"}>
       <div style="font-weight:700;font-size:14px;margin-top:6px">Drenaj alanı</div>
       <div class="muted">${p?`${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · `:""}çıkış noktası ${fmt(H[pour])} m</div>
@@ -102,20 +108,35 @@
         Kanalizasyon ve zemin emmesi C katsayısıyla kabaca temsil edilir. Gösterim amaçlıdır.</div>
       </div>`;
     box.querySelector(".x").onclick = hide;
+    box.querySelector(".zoom").onclick = () => fitCamera(CA.fitList, CA.wider);
     box.querySelector(".sum").onclick = () => { CA.open = !CA.open; box.classList.toggle("compact", !CA.open);
-      box.querySelector(".more").hidden = !CA.open; box.querySelector(".sum small").textContent = CA.open ? "▴ gizle" : "▾ ayrıntı"; };
+      box.querySelector(".more").hidden = !CA.open; box.querySelector(".sum small").textContent = CA.open ? "▴ gizle" : "▾ ayrıntı"; if(CA.pos) place(CA.pos); };
     box.hidden = false;
-    fitCamera(U.list);
+    CA.fitList = U.list.concat(inflows.map(q => q.i)); CA.wider = Aext > 0;
+    place(pos);
     drawDereOverlay();
   }
+  // kutuyu sağ tıklanan yerin yanına koy (ekrandan taşmasın); konum yoksa üst ortada
+  function place(pos){
+    const view = box.parentElement, vr = view.getBoundingClientRect();
+    if(!pos){ box.classList.remove("at"); box.style.left = ""; box.style.top = ""; return; }
+    box.classList.add("at");
+    const w = box.offsetWidth || 340, h = box.offsetHeight || 80;
+    let x = pos.x - vr.left + 14, y = pos.y - vr.top + 14;
+    if(x + w > vr.width - 8) x = pos.x - vr.left - w - 14;
+    if(y + h > vr.height - 8) y = Math.max(8, vr.height - h - 8);
+    box.style.left = Math.max(8, x) + "px"; box.style.top = Math.max(8, y) + "px";
+    CA.pos = pos;
+  }
+
   // kamerayı havzanın tamamı görünecek şekilde yumuşakça uçur (üstteki özet panel için biraz aşağı kaydırarak)
-  function fitCamera(list){
+  function fitCamera(list, wider){
     if(typeof setView !== "function" || typeof controls === "undefined") return;
     let x0=N, x1=0, y0=N, y1=0; for(const i of list){ const x=i%N, y=(i-x)/N; if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
     const toW = v => (v/(N-1) - .5)*SIZE, H0 = (window.BURN&&BURN.visual&&BURN.visual.length===b.length) ? BURN.visual : b;
     const cx = toW((x0+x1)/2), cz = toW((y0+y1)/2), ext = Math.max(toW(x1)-toW(x0), toW(y1)-toW(y0), 6);
     const ci = Math.round((y0+y1)/2)*N + Math.round((x0+x1)/2), cy = Math.max(0, H0[ci]||0)*sc()*S.ex;
-    const fov = (camera.fov||45)*Math.PI/180, dist = Math.min(controls.maxDistance||500, Math.max(12, ext*0.75/Math.tan(fov/2)));
+    const fov = (camera.fov||45)*Math.PI/180, dist = Math.min(controls.maxDistance||500, Math.max(12, ext*(wider?1.0:0.75)/Math.tan(fov/2)));
     const polar = Math.min(Math.max(controls.getPolarAngle(), 0.55), 0.95);
     setView(polar, controls.getAzimuthalAngle(), dist, new THREE.Vector3(cx, cy, cz));
   }
@@ -139,6 +160,20 @@
         // havza sınırı: koyu gölge + turuncu çizgi
         for(const [w,col] of [[5,"rgba(0,0,0,.55)"],[2.5,"#ffb020"]]){ g.lineWidth=w; g.strokeStyle=col; g.lineCap="round"; g.beginPath();
           for(const [a,b2,c,e] of edge){ g.moveTo(a*f,b2*f); g.lineTo(c*f,e*f); } g.stroke(); }
+        // pencere dışından gelen yukarı havza: kenarda içeri bakan ok + alan etiketi
+        for(const q of (CA.inflows||[])){
+          if(q.area < 0.05e6) continue;              // çok küçük girişler kalabalık yapmasın
+          const x = q.i % N, y = Math.floor(q.i / N), dv = [[1,0],[-1,0],[0,1],[0,-1]][q.side];
+          const bx = x*f, by = y*f, L = f*(10 + 4*Math.log10(1 + q.area/1e6)), w = f*3.5;
+          const tx = bx + dv[0]*L, ty = by + dv[1]*L, px2 = -dv[1]*w, py2 = dv[0]*w;
+          g.beginPath(); g.moveTo(tx,ty); g.lineTo(bx+px2,by+py2); g.lineTo(bx+dv[0]*L*0.35,by+dv[1]*L*0.35); g.lineTo(bx-px2,by-py2); g.closePath();
+          g.lineWidth = 4; g.strokeStyle = "rgba(0,0,0,.6)"; g.stroke(); g.fillStyle = "#ffb020"; g.fill();
+          if(q.area < 0.5e6) continue;               // etiket yalnız büyük girişlerde
+          const lab = `+${q.area>=1e6 ? fmt(q.area/1e6,1)+" km²" : fmt(q.area/1e4,0)+" ha"} yukarı havzadan`;
+          g.font = "bold 22px system-ui"; g.textAlign = dv[0]>0 ? "left" : dv[0]<0 ? "right" : "center"; g.textBaseline = dv[1]>0 ? "top" : dv[1]<0 ? "bottom" : "middle";
+          const lx = tx + dv[0]*8 + (dv[0]===0 ? 0 : 0), ly = ty + dv[1]*8;
+          g.lineWidth = 5; g.strokeStyle = "rgba(0,0,0,.75)"; g.strokeText(lab, lx, ly); g.fillStyle = "#ffd27a"; g.fillText(lab, lx, ly);
+        }
         const px = (CA.pour%N)*f, py = Math.floor(CA.pour/N)*f;
         g.fillStyle = "#ffb020"; g.strokeStyle = "#000"; g.lineWidth = 2; g.beginPath(); g.arc(px, py, 7, 0, 7); g.fill(); g.stroke();
         g.restore(); dereTex.needsUpdate = true;

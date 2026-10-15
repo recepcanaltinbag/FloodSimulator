@@ -55,7 +55,7 @@
       const a = e.target.closest("button")?.dataset.a; if(!a) return;
       if(a === "ll") copy(ll, "Koordinat kopyalandı");
       if(a === "full") copy(`${ll}, ${p.h.toFixed(1)} m${p.w!=null?`, su ${p.w.toFixed(2)} m`:""}`, "Koordinat ve yükseklik kopyalandı");
-      if(a === "catch" && window.CATCH) CATCH.show(p.gx, p.gy);
+      if(a === "catch" && window.CATCH) CATCH.show(p.gx, p.gy, {x:clientX, y:clientY});
       if(a === "gm") window.open(`https://www.google.com/maps?q=${f5(p.lat)},${f5(p.lon)}`, "_blank", "noopener");
       menu.hidden = true;
     };
