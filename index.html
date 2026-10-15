@@ -106,9 +106,8 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .panel ol li{margin:2px 0}
 .panel ol li span{color:var(--muted)}
 .muted{color:var(--muted)}
-.stats{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
-.stats.k8{grid-template-columns:repeat(8,1fr)}
-@media (max-width:1100px){.stats,.stats.k8{grid-template-columns:repeat(4,1fr)}}
+.stats{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
+@media (max-width:1100px){.stats,.stats.k8{grid-auto-flow:row;grid-template-columns:repeat(4,1fr)}}
 @media (max-width:600px){.stats,.stats.k8{grid-template-columns:repeat(2,1fr)}}
 .stat .k{font-size:11px;color:var(--muted)}
 .stat .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
@@ -328,6 +327,9 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <p class="sub" id="karstInfo" style="margin-top:4px" hidden></p>
     <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:8px"><input type="checkbox" id="depSink"> 🕳️ Kapalı çukurlar yeraltına boşalsın</label>
     <p class="sub" id="depInfo" style="margin-top:4px"></p>
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer;margin-top:10px"><input type="checkbox" id="upOn" checked> 🏞️ Havzadan gelen su <span class="muted" style="font-weight:400">(yukarı havza)</span></label>
+    <p class="sub" id="upInfo" style="margin-top:4px"></p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Simülasyon alanının dışında kalan yukarı havzaya düşen yağmurun zemin ve kanalizasyon ayarlarına göre kalan kısmı, dere yataklarından gecikmeli olarak alanın kenarından girer. Kaba yükseklik verisi (~115 m hücre) ve D8 akış yönleriyle hesaplanır; hız yamaçta ~0,5, derede ~1,5 m/s varsayılır. Dışarıdaki kapalı çukurlar (baraj gölü, maden çukuru ya da kaba veride yol dolgusu olabilir) normalde dolu sayılır ve suyu geçirir; karst modunda ya da “Kapalı çukurlar yeraltına boşalsın” açıkken dolana kadar suyu tutar ve her biri en çok 5 m³/s yutar. Dere ıslahı ve kanallar hesaba katılmaz.</p>
     <p class="sub" style="margin-top:4px;font-size:11px">Kapalı çukur analizi: dolgu derinliği ≥ 2 m ve ≥ 5 hücrelik çukurlar OSM göl/baraj verisiyle karşılaştırılır; göl yoksa en alçak hücre yutak olur (5 m³/s). Topografya + OSM çıkarımıdır, jeoloji haritası değildir; DEM hataları yanlış işaret üretebilir.</p>
     <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken zemin “Karstik kireçtaşı” (80 mm/sa) olur ve her düden en çok 5 m³/s su yutar.</p>
   </div>
@@ -377,7 +379,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="lbls" id="lblToggles"></div>
 
   <p class="note">
-    Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür; kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
+    Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür, ama oraya düşen yağmurun bu alana akan kısmı kaba bir havza modeliyle kenardan girer ("Havzadan gelen su"); kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
     Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
   </p>
 </div>
@@ -393,6 +395,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <div class="row"><span class="sw" style="background:var(--warn)"></span>"Dere" adlı yol (su altında)</div>
       <div class="row"><span class="sw" style="background:var(--cyan)"></span>Dere / kanal</div>
       <div class="row" id="lgDep" hidden><span class="sw" style="height:8px;width:8px;border-radius:50%;border:1.5px dashed #c58cff"></span>Kapalı çukur, göl yok</div>
+      <div class="row" id="lgUp" hidden><span class="sw" style="width:0;height:0;border-radius:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #8fd3ff"></span>Havzadan su girişi</div>
       <div class="row" id="lgPonor" hidden><span class="sw" style="background:#0a8f8f;height:8px;width:8px;border-radius:50%;box-shadow:0 0 0 2px #0a8f8f inset,0 0 0 1px #000"></span>Varsayılan düden (karst)</div>
     </div>
     <button class="set-tab" id="setTab" aria-controls="settings">⚙️ Ayarlar</button>
@@ -415,6 +418,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <label><input type="checkbox" id="showRoads" checked> <span class="sw" style="background:var(--amber)"></span> Adında "dere" geçen yollar</label>
       <label><input type="checkbox" id="showWater" checked> <span class="sw" style="background:var(--cyan)"></span> Dereler / kanallar</label>
       <label><input type="checkbox" id="showDep" checked> <span class="sw" style="background:#c58cff"></span> Kapalı çukurlar <span class="muted">(göl yok)</span></label>
+      <label><input type="checkbox" id="showUp" checked> <span class="sw" style="background:#8fd3ff"></span> Yukarı havza <span class="muted">(giriş okları, çevrede sınır)</span></label>
       <label><input type="checkbox" id="showPonor" checked> <span class="sw" style="background:#0a8f8f"></span> Düdenler <span class="muted">(karst modu)</span></label>
       <div id="dereBody" class="muted" style="margin-top:6px">Bölge yüklenince gösterilecek.</div>
       <div class="muted" style="font-size:10.5px;margin-top:6px">Kaynak: OpenStreetMap</div>
@@ -428,6 +432,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <div class="stat"><div class="k">Karadaki su hacmi</div><div class="v" id="sV">0 m³</div></div>
     <div class="stat"><div class="k">Kanalizasyon doluluğu</div><div class="v" id="sS">—</div><div class="gauge"><i id="gS"></i></div></div>
     <div class="stat"><div class="k">Kanala giden su</div><div class="v" id="sK">0 m³</div></div>
+    <div class="stat" id="stI"><div class="k">Dışarıdan gelen su</div><div class="v" id="sI">0 m³</div></div>
     <div class="stat" id="stU" hidden><div class="k">Yeraltına giden su</div><div class="v" id="sU">0 m³</div></div>
   </div>
 </div>
@@ -472,7 +477,7 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, landN:1, rate:200, durH:6, inf:8, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:200, durH:6, inf:8, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -772,7 +777,7 @@ async function loadRegion(shift){
     $("regName").textContent=S.name;
     $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
     b=sb; sea=nsea; S.cell=cell;
-    karstPrep();
+    karstPrep(); upPrep();
     S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
     elevCanvas=null; roadCanvas=null; blendCanvas=null; // yükseklik renkleri gerektiğinde üretilir
     satCanvas=sat; if(!sat) $("tex").value="elev";
@@ -930,6 +935,7 @@ const LCATS = {
   worship:{t:"Camiler / ibadet", ic:"🕌", pr:3, on:false},
   road:{t:"Ana caddeler",    ic:"",   pr:4, on:false},
   cukur:{t:"Kapalı çukurlar", ic:"🕳️", pr:0.5, on:true},
+  giris:{t:"Havza girişleri", ic:"🏞️", pr:0.4, on:true},
 };
 Object.entries(LCATS).forEach(([k,c])=>{
   const l=document.createElement("label");
@@ -977,7 +983,7 @@ async function loadLabels(staticOnly){
     LABELS.sort((a,b)=>(b.top-a.top)||(a.pr-b.pr));
     LABELS.forEach(l=>{ l.el.style.display="block"; l.w=l.el.offsetWidth; l.h=l.el.offsetHeight; });
     Object.keys(LCATS).forEach(k=>$("lc-"+k).textContent=cnt[k]||"");
-    depLabels(true); // kapalı çukur etiketleri (cukur) LABELS'a yeniden eklenir
+    depLabels(true); upLabels(true); // kapalı çukur etiketleri (cukur) LABELS'a yeniden eklenir
   };
   finish(); if(staticOnly) return;
   const bk=await baked();
@@ -997,7 +1003,7 @@ function updateLabels(){
   const lvl=dist>220?0:dist>110?1:2, cap=[10,16,24][lvl];
   for(const l of LABELS){
     let show=LCATS[l.cat].on && placed.length<cap &&
-      (lvl===2 || l.cat==="suburb" || l.cat==="cukur" || (lvl===1 && (l.cat==="square"||l.cat==="monument"||l.st)));
+      (lvl===2 || l.cat==="suburb" || l.cat==="cukur" || l.cat==="giris" || (lvl===1 && (l.cat==="square"||l.cat==="monument"||l.st)));
     if(show){
       const gx=Math.round(l.g[0]), gy=Math.round(l.g[1]), i=gy*N+gx;
       _v.set((l.g[0]/(N-1)-.5)*SIZE, Math.max(0,b[i]+(d?d[i]:0))*k+0.4, (l.g[1]/(N-1)-.5)*SIZE).project(camera);
@@ -1283,17 +1289,279 @@ function depLabels(measure){ // göl olmayan en büyük çukurlara etiket (LABEL
 $("depSink").onchange=()=>{ sinkRebuild(); karstUI(); updStats(); };
 $("showDep").onchange=()=>{ depUI(); drawDereOverlay(); };
 
+// ================= Yukarı havza (pencere dışından gelen su) =================
+// Etkin pencerenin 5–10 katı alan için kaba DEM (aynı terrarium karoları, düşük zoom, aynı LRU önbellek) → priority-flood
+// doldurma, D8 akış yönleri ve akış birikimi (Web Worker'da). Dışarıdaki her kara hücresinin suyu D8 yoluyla pencere
+// kenarına, denize ya da analiz alanı dışına gider; kenarı geçtiği yerler giriş noktalarına kümelenir. Zaman-alan yöntemi:
+// gecikme = yol uzunluğu / hız (yamaç ~0,5, dere ~1,5 m/s). Kapalı çukurlar normalde dolu sayılır (kaba DEM'de çoğu yol
+// dolgusu, dolu baraj ya da maden çukuru; Kağıthane'de yukarı havzanın %98'i böyle bir çukurdan geçiyor); karst modunda ya da
+// "kapalı çukurlar boşalsın" açıkken dolana kadar tutar ve her biri en çok PONOR_Q yutar. Yağış fazlası = yağış − sızma − kanalizasyon
+// (aynı ayarlar, dış alan için ayrı boru hacmi). Dakikalık adımlar; geçmiş tutulur: pencere kayınca yeni havza aynı
+// geçmişle yeniden oynatılır, yoldaki su kaybolmaz.
+const UP_DT=60, UP_VS=0.5, UP_VC=1.5, UP_AC=1e6, UP_KMAX=1440, UP_SIG=0.3e6, UP_RAD=10, UP_ARR=8; // s, m/s, m/s, m², adım, m², hücre, en çok ok
+const UPC=MOBILE ? {s:{dz:5,G:160}, m:{dz:4,G:192}, l:{dz:4,G:160}} : {s:{dz:4,G:320}, m:{dz:3,G:384}, l:{dz:3,G:320}};
+const UP={on:true, gen:0, R:null, status:"", tick:0, liveTo:0, eH:[], sH:[], so:0, mesh:null, worker:undefined, wait:new Map()};
+const UP_SIDE=["batı","doğu","kuzey","güney"];
+function upAnalyze(p){ // saf fonksiyon: Worker'da da çalışır (dış değişken kullanmaz)
+  const {G,dem,f,X0,Y0,x0,y0,N,cm,dt,vS,vC,aC,kMax,dMin,dPit,sig,rad}=p, n=G*G, cA=cm*cm, SQ=Math.SQRT2;
+  const DU=[-1,1,0,0,-1,1,-1,1], DV=[0,0,-1,1,-1,-1,1,1];
+  const win=new Uint8Array(n), sea=new Uint8Array(n);
+  for(let v=0;v<G;v++) for(let u=0;u<G;u++){ const i=v*G+u, X=(X0+u+.5)*f, Y=(Y0+v+.5)*f;
+    if(X>=x0&&X<x0+2*N&&Y>=y0&&Y<y0+2*N) win[i]=1; if(dem[i]<=0.3) sea[i]=1; }
+  // priority-flood (8 komşu): kenar ve deniz hücrelerinden; çıkış sırası aynı zamanda akış yönünde topolojik sıradır
+  const F=new Float64Array(n), done=new Uint8Array(n), par=new Int32Array(n).fill(-1), ord=new Int32Array(n), pos=new Int32Array(n);
+  const hk=new Float64Array(n), hi=new Int32Array(n); let hs=0, no=0;
+  const push=(i,v)=>{ let c=hs++; while(c>0){ const q=(c-1)>>1; if(hk[q]<=v) break; hk[c]=hk[q]; hi[c]=hi[q]; c=q; } hk[c]=v; hi[c]=i; };
+  const pop=()=>{ const top=hi[0], v=hk[--hs], ii=hi[hs]; let c=0;
+    for(;;){ let l=2*c+1; if(l>=hs) break; if(l+1<hs&&hk[l+1]<hk[l]) l++; if(hk[l]>=v) break; hk[c]=hk[l]; hi[c]=hi[l]; c=l; }
+    hk[c]=v; hi[c]=ii; return top; };
+  for(let v=0;v<G;v++) for(let u=0;u<G;u++){ const i=v*G+u; if(sea[i]||!u||!v||u===G-1||v===G-1){ F[i]=dem[i]; done[i]=1; push(i,F[i]); } }
+  while(hs){
+    const i=pop(), u=i%G, v=(i-u)/G, fi=F[i]; pos[i]=no; ord[no++]=i;
+    for(let k=0;k<8;k++){ const uu=u+DU[k], vv=v+DV[k]; if(uu<0||vv<0||uu>=G||vv>=G) continue; const j=vv*G+uu; if(done[j]) continue;
+      done[j]=1; F[j]=dem[j]>fi?dem[j]:fi; par[j]=i; push(j,F[j]); }
+  }
+  // D8: doldurulmuş yüzeyde en dik iniş; düzlükte (ve çukur içinde) dolgu ağacındaki ebeveyn
+  const dir=new Int32Array(n).fill(-1);
+  for(let i=0;i<n;i++){
+    if(sea[i]||par[i]<0) continue;
+    const u=i%G, v=(i-u)/G; let best=-1, bs=0;
+    for(let k=0;k<8;k++){ const uu=u+DU[k], vv=v+DV[k]; if(uu<0||vv<0||uu>=G||vv>=G) continue; const j=vv*G+uu, s=(F[i]-F[j])/(k<4?1:SQ); if(s>bs){ bs=s; best=j; } }
+    dir[i]=best>=0?best:par[i];
+  }
+  const acc=new Float32Array(n);
+  for(let i=0;i<n;i++) if(!sea[i]) acc[i]=1;
+  for(let q=no-1;q>=0;q--){ const i=ord[q], j=dir[i]; if(j>=0&&!sea[j]) acc[j]+=acc[i]; }
+  // kapalı çukurlar (pencereye değmeyen, en derin noktası ≥ dPit): dolana kadar tutan düğümler
+  const comp=new Int32Array(n).fill(-1), all=[], st=[];
+  for(let s0=0;s0<n;s0++){
+    if(comp[s0]>=0||win[s0]||sea[s0]||F[s0]-dem[s0]<=dMin) continue;
+    const D={pit:s0,mx:0,vol:0,touch:false,cells:[]}; comp[s0]=all.length; st.push(s0);
+    while(st.length){
+      const i=st.pop(), u=i%G, v=(i-u)/G, dd=F[i]-dem[i]; D.cells.push(i); D.vol+=dd*cA; if(dd>D.mx) D.mx=dd; if(dem[i]<dem[D.pit]) D.pit=i;
+      for(let k=0;k<8;k++){ const uu=u+DU[k], vv=v+DV[k]; if(uu<0||vv<0||uu>=G||vv>=G) continue; const j=vv*G+uu;
+        if(win[j]) D.touch=true; else if(comp[j]<0&&!sea[j]&&F[j]-dem[j]>dMin){ comp[j]=all.length; st.push(j); } }
+    }
+    all.push(D);
+  }
+  const K=[]; comp.fill(-1);
+  for(const D of all){ if(D.touch||D.mx<dPit) continue; for(const i of D.cells) comp[i]=K.length; K.push({pit:D.pit,vol:D.vol,mx:D.mx,down:-1,tau:0,set:false}); }
+  // her hücre için hedef (term): ≥0 pencere kenarı (çevre konumu = kenar·N + sıra), ≤−2 çukur, −1 kayıp (deniz / alan dışı)
+  const gc=i=>{ const u=i%G, v=(i-u)/G; return [((X0+u+.5)*f-x0-1)/2, ((Y0+v+.5)*f-y0-1)/2]; };
+  const cl1=t=>Math.max(0,Math.min(N-1,Math.round(t)));
+  const entry=(i,j)=>{ const a=gc(i), c=gc(j), ox=a[0]<0?-a[0]:a[0]>N-1?a[0]-N+1:0, oy=a[1]<0?-a[1]:a[1]>N-1?a[1]-N+1:0;
+    return ox>=oy ? (a[0]<0?0:1)*N+cl1((a[1]+c[1])/2) : (a[1]<0?2:3)*N+cl1((a[0]+c[0])/2); };
+  const step=(i,j)=>{ const dg=(i-j)%G!==0 && Math.abs(i-j)!==1; return (dg?cm*SQ:cm)/(acc[i]*cA>=aC?vC:vS); };
+  const term=new Int32Array(n).fill(-1), tau=new Float32Array(n);
+  for(let q=0;q<no;q++){
+    const i=ord[q]; if(sea[i]||win[i]) continue;
+    const j=dir[i], c=comp[i];
+    if(c>=0){ term[i]=-2-c; const D=K[c];
+      if(!D.set&&(j<0||comp[j]!==c)){ D.set=true;
+        if(j<0||sea[j]) D.down=-1; else if(win[j]){ D.down=entry(i,j); D.tau=step(i,j); } else { D.down=term[j]; D.tau=term[j]===-1?0:tau[j]+step(i,j); } }
+      continue; }
+    if(j<0||sea[j]) continue;
+    if(win[j]){ term[i]=entry(i,j); tau[i]=step(i,j); }
+    else if(term[j]!==-1){ term[i]=term[j]; tau[i]=tau[j]+step(i,j); }
+  }
+  // çukurlar akış yönünde: yukarıdaki önce (taşan su aşağıdakine eklenir)
+  const korder=K.map((D,c)=>c).sort((a,c)=>pos[K[c].pit]-pos[K[a].pit]);
+  const E=new Float64Array(4*N), aD=new Float64Array(K.length);
+  for(let i=0;i<n;i++){ const t=term[i]; if(t>=0) E[t]+=cA; else if(t<=-2) aD[-2-t]+=cA; }
+  for(const c of korder){ const dn=K[c].down; if(dn>=0) E[dn]+=aD[c]; else if(dn<=-2) aD[-2-dn]+=aD[c]; }
+  // kenar konumlarını kümele: en büyük girişten başlayarak ±rad hücre aynı kümeye
+  const ids=[]; for(let e=0;e<4*N;e++) if(E[e]>0) ids.push(e);
+  ids.sort((a,c)=>E[c]-E[a]);
+  const cl=new Int32Array(4*N).fill(-1), CL=[];
+  for(const e of ids){
+    if(cl[e]>=0) continue;
+    const side=(e/N)|0, a=e%N, id=CL.length; CL.push({side,along:a,area:0});
+    for(let t=Math.max(0,a-rad);t<=Math.min(N-1,a+rad);t++){ const e2=side*N+t; if(cl[e2]<0&&E[e2]>0){ cl[e2]=id; CL[id].area+=E[e2]; } }
+  }
+  const C=CL.length, nn=C+K.length, KM=kMax+1;
+  const nodeOf=t=>t>=0?cl[t]:t<=-2?C-2-t:-1;
+  // düğüm başına gecikme histogramı (alan, m²): seyrek
+  const Hm=new Map(); let maxK=0;
+  for(let i=0;i<n;i++){ const t=term[i]; if(t===-1) continue; const k=Math.min(kMax,Math.round(tau[i]/dt)); if(k>maxK) maxK=k;
+    const key=nodeOf(t)*KM+k; Hm.set(key,(Hm.get(key)||0)+cA); }
+  const keys=[...Hm.keys()].sort((a,c)=>a-c), hS=new Int32Array(nn+1), hK=new Int32Array(keys.length), hA=new Float64Array(keys.length);
+  keys.forEach((key,q)=>{ const nd=Math.floor(key/KM); hK[q]=key-nd*KM; hA[q]=Hm.get(key); hS[nd+1]++; });
+  for(let z=0;z<nn;z++) hS[z+1]+=hS[z];
+  const deps=korder.map(c=>{ const D=K[c], k=Math.min(kMax,Math.round(D.tau/dt)); if(k>maxK) maxK=k; const pu=D.pit%G; return {node:C+c,down:nodeOf(D.down),k,cap:D.vol,mx:D.mx,X:(X0+pu+.5)*f,Y:(Y0+(D.pit-pu)/G+.5)*f}; });
+  // çizim: önemli kümelerin havza sınırı ve ana dere yatakları (zd pikseli + yükseklik)
+  const fin=new Int32Array(K.length).fill(-3);
+  const finD=c=>{ if(fin[c]!==-3) return fin[c]; const dn=K[c].down; return fin[c]= dn>=0?cl[dn] : dn<=-2?finD(-2-dn) : -1; };
+  const lab=new Int32Array(n);
+  for(let i=0;i<n;i++){ const t=term[i]; lab[i]= win[i]?-2 : t>=0?cl[t] : t<=-2?finD(-2-t) : -1; }
+  const isS=c=>c>=0&&CL[c].area>=sig, seg=[], ch=[];
+  for(let v=0;v<G;v++) for(let u=0;u<G;u++){
+    const i=v*G+u; if(win[i]) continue;
+    if(u<G-1){ const j=i+1; if(!win[j]&&lab[i]!==lab[j]&&(isS(lab[i])||isS(lab[j]))){ const X=(X0+u+1)*f, h=Math.max(dem[i],dem[j],0); seg.push(X,(Y0+v)*f,h,X,(Y0+v+1)*f,h); } }
+    if(v<G-1){ const j=i+G; if(!win[j]&&lab[i]!==lab[j]&&(isS(lab[i])||isS(lab[j]))){ const Y=(Y0+v+1)*f, h=Math.max(dem[i],dem[j],0); seg.push((X0+u)*f,Y,h,(X0+u+1)*f,Y,h); } }
+    const j=dir[i];
+    if(isS(lab[i])&&acc[i]*cA>=aC&&j>=0&&!sea[j]){ const uj=j%G, vj=(j-uj)/G, hj=win[j]?dem[i]:dem[j];
+      ch.push((X0+u+.5)*f,(Y0+v+.5)*f,Math.max(dem[i],0),(X0+uj+.5)*f,(Y0+vj+.5)*f,Math.max(hj,0)); }
+  }
+  let totA=0; for(const q of CL) totA+=q.area;
+  return {C,CL,nn,hS,hK,hA,deps,maxK,seg:new Float32Array(seg),ch:new Float32Array(ch),totA,depN:K.length,cm};
+}
+function upRun(p){
+  if(UP.worker===undefined){
+    try{
+      const src=`${upAnalyze.toString()}\nonmessage=e=>postMessage({id:e.data.id,r:upAnalyze(e.data.p)});`;
+      UP.worker=new Worker(URL.createObjectURL(new Blob([src],{type:"text/javascript"})));
+      UP.worker.onmessage=e=>{ const fn=UP.wait.get(e.data.id); if(fn){ UP.wait.delete(e.data.id); fn(e.data.r); } };
+      UP.worker.onerror=e=>{ e.preventDefault(); UP.worker=null; const w=[...UP.wait.values()]; UP.wait.clear(); w.forEach(fn=>fn(null)); };
+    }catch(e){ UP.worker=null; }
+  }
+  if(!UP.worker) return idle().then(()=>upAnalyze(p));
+  return new Promise(res=>{ const id=p.gen; UP.wait.set(id,r=>res(r||upAnalyze(p))); UP.worker.postMessage({id,p}); });
+}
+async function upPrep(){
+  const gen=++UP.gen, reg=REG;
+  UP.R=null; UP.liveTo=UP.tick; upMeshClear(); upLabels(true);
+  if(!UP.on){ UP.status=""; upUI(); return; }
+  UP.status="hesap"; upUI();
+  try{
+    const c=UPC[S.size], f=2**c.dz, zc=reg.zd-c.dz, G=c.G, X0=Math.round(reg.cx/f-G/2), Y0=Math.round(reg.cy/f-G/2);
+    const dem=await demRegion(zc,X0,Y0,G,G,true);
+    if(gen!==UP.gen||reg!==REG) return;
+    const lat=px2ll(reg.cx,reg.cy,reg.n).lat, cm=156543.03*Math.cos(lat*Math.PI/180)/2**zc;
+    const res=await upRun({gen,G,dem,f,X0,Y0,x0:reg.x0,y0:reg.y0,N,cm,dt:UP_DT,vS:UP_VS,vC:UP_VC,aC:UP_AC,kMax:UP_KMAX,dMin:KARST_DMIN,dPit:KARST_DPIT,sig:UP_SIG,rad:UP_RAD});
+    if(gen!==UP.gen||reg!==REG||!UP.on) return;
+    upBuild(res,f);
+  }catch(e){ console.warn("Yukarı havza hesaplanamadı",e); if(gen===UP.gen){ UP.status="hata"; upUI(); } }
+}
+function upBuild(res,f){
+  const C=res.C, W=new Uint8Array(N*N), r2=Math.ceil(f/4)+2, cls=[];
+  for(let c=0;c<C;c++){
+    const q=res.CL[c], side=q.side;
+    const at=t=>side===0?t*N : side===1?t*N+N-1 : side===2?t : (N-1)*N+t, inw=[1,-1,N,-N][side];
+    let best=-1, bt=0; // kaba hücre içinde ince ızgaradaki en alçak kenar hücresi = dere yatağı
+    for(let t=Math.max(0,q.along-r2);t<=Math.min(N-1,q.along+r2);t++){ const i=at(t); if(sea[i]) continue; if(best<0||b[i]<b[best]){ best=i; bt=t; } }
+    if(best<0){ cls.push(null); continue; }
+    // vadi tabanı: en alçak hücreden itibaren +2 m'ye kadar olan komşu kenar hücreleri (en az ±1, en çok ±6)
+    const lo=b[best]+2; let ta=bt, tb=bt;
+    while(ta>0&&bt-ta<6&&!sea[at(ta-1)]&&b[at(ta-1)]<=lo) ta--;
+    while(tb<N-1&&tb-bt<6&&!sea[at(tb+1)]&&b[at(tb+1)]<=lo) tb++;
+    ta=Math.min(ta,Math.max(0,bt-1)); tb=Math.max(tb,Math.min(N-1,bt+1));
+    const cells=[];
+    for(let t=ta;t<=tb;t++){ const i=at(t); if(sea[i]) continue; cells.push(i); if(!sea[i+inw]) cells.push(i+inw); }
+    // giriş çevresi dışarı akıtmaz (duvar): yoksa kenarda yayılan su hemen geri çıkar
+    for(let t=Math.max(0,ta-8);t<=Math.min(N-1,tb+8);t++) W[at(t)]=1;
+    cls.push({cells,area:q.area,side,i:best,pend:0,rate:0});
+  }
+  const RB=res.maxK+1;
+  UP.R={C,nn:res.nn,hS:res.hS,hK:res.hK,hA:res.hA,deps:res.deps,RB,ring:new Float64Array(res.nn*RB),store:new Float64Array(res.nn),out:new Float64Array(C),
+        cls,W,sunk:0,lost:0,totA:res.totA,depN:res.depN,cm:res.cm};
+  UP.R.sig=cls.filter(q=>q&&q.area>=UP_SIG).sort((a,c)=>c.area-a.area).slice(0,UP_ARR);
+  upReplay(UP.liveTo);
+  UP.status="tamam"; upMeshBuild(res); upLabels(true); upUI(); drawDereOverlay(); updStats();
+}
+function upRoute(t){ // t. dakika adımı: kaynaklar (zaman-alan) → çukurlar (yukarıdan aşağı) → giriş noktaları (R.out, m³)
+  const R=UP.R, {hS,hK,hA,ring,RB,store,out,C}=R, slot=t%RB, eH=UP.eH;
+  for(let nd=0;nd<R.nn;nd++){ let v=0; for(let q=hS[nd];q<hS[nd+1];q++){ const tt=t-hK[q]; if(tt>=0) v+=hA[q]*eH[tt]; } if(v) ring[nd*RB+slot]+=v; }
+  for(const D of R.deps){
+    const s=D.node*RB+slot; let w=store[D.node]+ring[s]; ring[s]=0;
+    const cap=UP.sH[t]?D.cap:0; // yutak modu kapalıyken çukur dolu sayılır (yol dolgusu/menfez, dolu baraj): su geçer
+    if(UP.sH[t]&&w>0){ const tk=Math.min(w,PONOR_Q*UP_DT); w-=tk; R.sunk+=tk; }
+    if(w>cap){ const sp=w-cap; w=cap; if(D.down>=0) ring[D.down*RB+(t+D.k)%RB]+=sp; else R.lost+=sp; }
+    store[D.node]=w;
+  }
+  for(let c=0;c<C;c++){ const s=c*RB+slot; out[c]=ring[s]; ring[s]=0; }
+}
+function upReplay(from){ // geçmiş yağış fazlasını yeni havzayla baştan oynat; 'from' sonrası (enjekte edilmemiş) su birikmiş olarak verilir
+  const R=UP.R; if(!R) return;
+  R.ring.fill(0); R.store.fill(0); R.sunk=0; R.lost=0;
+  const back=new Float64Array(R.C);
+  for(let t=0;t<UP.tick;t++){ upRoute(t); if(t>=from) for(let c=0;c<R.C;c++) back[c]+=R.out[c]; }
+  // içinde bulunulan dakikanın kalan kısmı da (son adımın çıktısı) verilir: kaydırmadan sonra boşluk olmasın
+  const rem=from>=UP.tick ? Math.max(0,Math.min(1,(UP.tick*UP_DT-S.simT)/UP_DT)) : 0;
+  R.cls.forEach((q,c)=>{ const o=UP.tick?R.out[c]:0; if(q){ q.pend=back[c]+o*rem; q.rate=(back[c]+o)/UP_DT; } else R.lost+=back[c]; });
+}
+function upTick(){ // her UP_DT saniyede bir: dış alanın yağış fazlası (aynı zemin/kanalizasyon ayarları) ve yönlendirme
+  const t=UP.tick++, s=UP_DT/3.6e6, sw=S.sewer;
+  let a=Math.max(0,(t*UP_DT<S.durH*3600?S.rate:0)-S.inf)*s;
+  const tk=Math.min(a,sw.rate*(1-S.block/100)*s,Math.max(0,sw.store/1000-UP.so)+sw.out*s);
+  a-=tk; UP.so=Math.max(0,UP.so+tk-sw.out*s);
+  UP.eH[t]=a; UP.sH[t]=(SINK||KARST.on)?1:0;
+  const R=UP.R; if(!R||!UP.on) return;
+  upRoute(t);
+  R.cls.forEach((q,c)=>{ if(q){ q.pend+=R.out[c]; q.rate=q.pend/UP_DT; } else R.lost+=R.out[c]; });
+}
+function upReset(){
+  UP.tick=0; UP.liveTo=0; UP.eH=[]; UP.sH=[]; UP.so=0; S.extIn=0;
+  const R=UP.R; if(R){ R.ring.fill(0); R.store.fill(0); R.sunk=0; R.lost=0; R.cls.forEach(q=>{ if(q){ q.pend=0; q.rate=0; } }); }
+}
+function upMeshClear(){ if(UP.mesh){ scene.remove(UP.mesh.obj); UP.mesh.obj.geometry.dispose(); UP.mesh.obj.material.dispose(); UP.mesh=null; } }
+function upMeshBuild(res){
+  upMeshClear();
+  const nv=(res.seg.length+res.ch.length)/3; if(!nv) return;
+  const raw=new Float32Array(nv*3), col=new Float32Array(nv*3); let o=0;
+  for(const [arr,c] of [[res.seg,[0.85,0.92,1]],[res.ch,[0.2,0.7,0.95]]]) for(let q=0;q<arr.length;q+=3){ raw.set(arr.subarray(q,q+3),o); col.set(c,o); o+=3; }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute("position",new THREE.BufferAttribute(new Float32Array(nv*3),3)); geo.setAttribute("color",new THREE.BufferAttribute(col,3));
+  const obj=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.55,depthWrite:false}));
+  obj.renderOrder=2; UP.mesh={obj,raw}; upMeshScale(); upVis(); scene.add(obj);
+}
+function upMeshScale(){
+  const M=UP.mesh; if(!M||!REG) return;
+  const p=M.obj.geometry.attributes.position.array, k=sc()*S.ex;
+  for(let o=0;o<M.raw.length;o+=3){ p[o]=(M.raw[o]-REG.cx)*RW; p[o+1]=(M.raw[o+2]+10)*k+0.3; p[o+2]=(M.raw[o+1]-REG.cy)*RW; }
+  M.obj.geometry.attributes.position.needsUpdate=true; M.obj.geometry.computeBoundingSphere();
+}
+function upVis(){ if(UP.mesh) UP.mesh.obj.visible=RING.on&&UP.on&&$("showUp").checked; }
+function upCellXY(q,inw){ const x=q.i%N, y=(q.i-x)/N, dv=[[1,0],[-1,0],[0,1],[0,-1]][q.side]; return [x+dv[0]*inw, y+dv[1]*inw]; }
+function drawInflow(g,f){
+  const R=UP.R; if(!R||!UP.on||!$("showUp").checked) return;
+  for(const q of R.sig){
+    const [x,y]=upCellXY(q,0), dv=[[1,0],[-1,0],[0,1],[0,-1]][q.side], L=f*(5+3*Math.log10(1+q.area/1e6)), w=L*0.5;
+    const bx=x*f, by=y*f, tx=bx+dv[0]*L, ty=by+dv[1]*L, px=-dv[1]*w, py=dv[0]*w;
+    g.beginPath(); g.moveTo(tx,ty); g.lineTo(bx+px,by+py); g.lineTo(bx+dv[0]*L*0.3,by+dv[1]*L*0.3); g.lineTo(bx-px,by-py); g.closePath();
+    g.lineWidth=4; g.strokeStyle="rgba(0,0,0,.6)"; g.stroke(); g.fillStyle="#8fd3ff"; g.fill();
+  }
+}
+function upLabels(measure){
+  LABELS=LABELS.filter(l=>{ if(l.cat!=="giris") return true; l.el.remove(); return false; });
+  const R=UP.R, top=R&&UP.on&&$("showUp").checked ? R.sig.slice(0,4) : [];
+  for(const q of top){
+    const el=document.createElement("div"); el.className="lb c-giris"; el.textContent=`🏞️ Havzadan su · ${fmt(q.area/1e6,q.area<1e7?1:0)} km²`;
+    $("labels").appendChild(el);
+    LABELS.push({cat:"giris",name:"",g:upCellXY(q,8),el,pr:0.4,top:false,st:false,w:0,h:0});
+  }
+  $("lc-giris").textContent=top.length||"";
+  if(measure){ LABELS.sort((a,c)=>(c.top-a.top)||(a.pr-c.pr)); LABELS.forEach(l=>{ if(l.cat!=="giris") return; l.el.style.display="block"; l.w=l.el.offsetWidth; l.h=l.el.offsetHeight; }); }
+}
+function upUI(){
+  const R=UP.R;
+  $("stI").hidden=!UP.on; $("lgUp").hidden=!(UP.on&&R&&R.sig.length&&$("showUp").checked);
+  $("upInfo").textContent = !UP.on ? "Kapalı: yalnız simülasyon alanına düşen yağmur hesaplanır." :
+    UP.status==="hesap" ? "Çevredeki yukarı havza hesaplanıyor…" : UP.status==="hata" ? "Çevre yükseklik verisi alınamadı; dışarıdan su eklenmiyor." :
+    !R ? "" : !R.sig.length ? `Bu alana dışarıdan anlamlı dere girmiyor (toplam ${fmt(R.totA/1e6,2)} km² kenar şeridi).` :
+    `Pencere dışındaki ${fmt(R.totA/1e6,1)} km² alanın suyu buraya akıyor · ${R.sig.length} ana giriş; en büyüğü ${UP_SIDE[R.sig[0].side]} kenarında ${fmt(R.sig[0].area/1e6,1)} km²`+
+    (R.depN?` · dışarıda ${R.depN} kapalı çukur`:"")+` · hücre ≈ ${fmt(R.cm)} m.`;
+}
+$("upOn").onchange=e=>{
+  UP.on=e.target.checked;
+  if(UP.on){ if(UP.R) upReplay(UP.tick); else if(S.loaded) upPrep(); }
+  else if(UP.R) UP.R.cls.forEach(q=>{ if(q){ q.pend=0; q.rate=0; } });
+  upVis(); upLabels(true); upUI(); drawDereOverlay(); updStats();
+};
+$("showUp").onchange=()=>{ upVis(); upLabels(true); upUI(); drawDereOverlay(); };
+
 // ================= Simülasyon (virtual pipes) =================
 function resetWater(){
   if(!b) return;
   d=new Float32Array(N*N); H=new Float32Array(N*N);
   fL=new Float32Array(N*N); fR=new Float32Array(N*N); fT=new Float32Array(N*N); fB=new Float32Array(N*N);
   for(let i=0;i<N*N;i++) if(sea[i]) d[i]=-b[i];
-  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.under=0; S.underP=0; S.running=false; updPlay(); updStats();
+  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.under=0; S.underP=0; S.running=false; upReset(); updPlay(); updStats();
   if(waterMesh){ updateWaterMesh(); drawDereOverlay(); }
 }
 function simStep(dt){
   const l=S.cell, l2=l*l, C=dt*G*l, MN=dt*G*MANNING*MANNING/l, O=OBS;
+  while(S.simT>=UP.tick*UP_DT) upTick();
+  const UR=UP.on?UP.R:null, UW=UR?UR.W:null; // havza girişlerinde kenar duvar: giren su hemen dışarı akmasın
   for(let i=0;i<N*N;i++) H[i]=b[i]+d[i];
   for(let y=0;y<N;y++){
     for(let x=0;x<N;x++){
@@ -1302,7 +1570,7 @@ function simStep(dt){
       const h=H[i];
       // Manning sürtünmesi (örtük): v = Q/(l·h), sürtünme ∝ g n² v / h^(4/3)
       const dep=d[i]>0.005?d[i]:0.005, fc=MN/(dep*dep*Math.cbrt(dep)); // h·h^(4/3) = h²·∛h (pow'dan hızlı)
-      const hl= x>0?H[i-1]:b[i], hr= x<N-1?H[i+1]:b[i], ht= y>0?H[i-N]:b[i], hb= y<N-1?H[i+N]:b[i];
+      const eb=UW&&UW[i]?1e9:b[i], hl= x>0?H[i-1]:eb, hr= x<N-1?H[i+1]:eb, ht= y>0?H[i-N]:eb, hb= y<N-1?H[i+N]:eb;
       let a=fL[i]/(1+fc*fL[i])+C*(h-hl); a=a>0?a:0;
       let r=fR[i]/(1+fc*fR[i])+C*(h-hr); r=r>0?r:0;
       let t=fT[i]/(1+fc*fT[i])+C*(h-ht); t=t>0?t:0;
@@ -1346,6 +1614,18 @@ function simStep(dt){
   S.stored+=taken/S.landN; S.drained+=taken*S.cell*S.cell;
   if(K){ S.under+=(under+underP)*l2; S.underP+=underP*l2; }
   S.stored=Math.max(0,S.stored-outStep);
+  if(UR){ // yukarı havzadan gelen su: giriş hücrelerine eşit paylaştır
+    let inj=0;
+    for(const q of UR.cls){
+      if(!q||q.pend<=0) continue;
+      const v=Math.min(q.pend,q.rate*dt); q.pend-=v;
+      let m=0; for(const i of q.cells) if(!(O&&O[i])) m++;
+      if(!m){ UR.lost+=v; continue; }
+      const dz=v/(m*l2); for(const i of q.cells) if(!(O&&O[i])) d[i]+=dz;
+      inj+=v;
+    }
+    S.extIn+=inj;
+  }
   S.simT+=dt; if(raining) S.rainMM+=S.rate*dt/3600;
 }
 
@@ -1503,7 +1783,7 @@ function layScale(l){
   l.mesh.geometry.attributes.position.needsUpdate=true; l.skirt.geometry.attributes.position.needsUpdate=true;
   l.mesh.geometry.computeVertexNormals(); l.mesh.geometry.computeBoundingSphere(); l.skirt.geometry.computeBoundingSphere();
 }
-function ringRescale(){ RING.tiles.forEach(e=>e.lay.forEach(l=>l&&layScale(l))); }
+function ringRescale(){ RING.tiles.forEach(e=>e.lay.forEach(l=>l&&layScale(l))); upMeshScale(); }
 function ringShifted(){ // etkin pencere kaydı: bloklar hemen taşınır; etkin kenara bağlanan yükseklikler sonraki karelerde
   RING.last=null;
   RING.tiles.forEach(e=>e.lay.forEach(l=>{ if(!l) return; layPlace(e,l); if(l.near||layNear(e,l)) RING.reblend.push([e,l]); }));
@@ -1772,7 +2052,7 @@ function drawDereOverlay(){
   if(!dereCanvas) return;
   const g=dereCanvas.getContext("2d"), W=dereCanvas.width, f=W/(N-1);
   g.clearRect(0,0,W,W);
-  if(!DERE){ drawPonors(g,f); dereTex.needsUpdate=true; return; }
+  if(!DERE){ drawPonors(g,f); drawInflow(g,f); dereTex.needsUpdate=true; return; }
   g.lineCap=g.lineJoin="round";
   if($("showWater").checked){
     g.strokeStyle="#22e0ff"; g.lineWidth=2.5;
@@ -1794,7 +2074,7 @@ function drawDereOverlay(){
       }
     }
   }
-  drawPonors(g,f);
+  drawPonors(g,f); drawInflow(g,f);
   dereTex.needsUpdate=true;
 }
 function drawPonors(g,f){
@@ -1831,6 +2111,10 @@ function updStats(){
   $("gS").style.width=full+"%"; $("gS").style.background = full>95?"var(--warn)":full>70?"var(--amber)":"var(--accent)";
   $("sK").textContent = S.drained>1e6 ? fmt(S.drained/1e6,2)+" milyon m³" : fmt(S.drained)+" m³";
   const uv=v=>v>1e6 ? fmt(v/1e6,2)+" milyon m³" : fmt(v)+" m³";
+  const UR=UP.R, upQ=UR&&UP.on ? UR.cls.reduce((a,q)=>a+(q?q.rate:0),0) : 0;
+  if(UP.on){ $("sI").textContent=uv(S.extIn);
+    let tr=0; if(UR){ for(let k=0;k<UR.ring.length;k++) tr+=UR.ring[k]; for(let k=0;k<UR.store.length;k++) tr+=UR.store[k]; }
+    $("stI").title=UR ? `Pencere dışındaki ${fmt(UR.totA/1e6,1)} km² yukarı havzadan kenardan giren su · şu an ${fmt(upQ,upQ<10?1:0)} m³/s · yolda/çukurlarda bekleyen: ${uv(tr)}`+(UR.sunk?` · dış çukurlardan yeraltına: ${uv(UR.sunk)}`:"") : ""; }
   if(SINK||KARST.on){ $("sU").textContent=uv(S.under); $("stU").title=`Zemine süzülen: ${uv(S.under-S.underP)} · düden/çukurlardan: ${uv(S.underP)}`; }
   const raining=S.simT<S.durH*3600;
   $("liveSt").textContent = S.simT===0 ? `${S.name} · hazır` :
@@ -1840,6 +2124,7 @@ function updStats(){
     (full>95 && raining ? `<br><span style="color:var(--warn)">⚠️ Kanalizasyon dolu, ızgaralar suyu alamıyor</span>` : "") +
     (KARST.on ? `<br><span style="color:#3fd6d6">🕳️ Karst modu · ${KARST.ponors.length} düden · yeraltına ${uv(S.under)}</span>` :
      SINK ? `<br><span style="color:#c58cff">🕳️ Kapalı çukurlar boşalıyor · yeraltına ${uv(S.under)}</span>` : "") +
+    (UP.on&&S.extIn>0 ? `<br><span style="color:#8fd3ff">🏞️ Havzadan gelen su · ${uv(S.extIn)}${upQ>0.05?` · şu an ${fmt(upQ,upQ<10?1:0)} m³/s`:""}</span>` : "") +
     `<br><span class="muted">${S.name} · 1 hücre ≈ ${fmt(S.cell)} m</span>`;
   updDereStats();
 }
@@ -2037,7 +2322,7 @@ function setView(polar,az,dist,target){
   fly={t:0,fromT:controls.target.clone(),toT:t,fromP:camera.position.clone(),toP:p};
 }
 $("shiftBtn").onclick=shiftHere;
-$("ringOn").onchange=e=>{ RING.on=e.target.checked; RING.acc=1; };
+$("ringOn").onchange=e=>{ RING.on=e.target.checked; RING.acc=1; upVis(); };
 $("nNorth").onclick=()=>setView(controls.getPolarAngle(),0,camDist());
 $("nIn").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.max(6,camDist()*0.6));
 $("nOut").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.min(500,camDist()*1.6));
