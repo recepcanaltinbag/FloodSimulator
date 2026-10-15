@@ -3,6 +3,9 @@
 //   "fc":   önümüzdeki 3 günün tahmininde en yağışlı 12 saat; hata payı ECMWF topluluk tahmininden (51 üye):
 //           iyimser (%10) / olası (medyan) / kötümser (%90) senaryo üyeleri
 // index.html'deki globalleri (S, simStep, loadRegion, resetWater, updPlay, $, fmt) kullanır; ana betikten SONRA yüklenmelidir.
+// Gömülü OSM verisini (osm-cache.js) bu betikten hemen sonra yükle; index.html'ye ayrı etiket gerekmesin.
+// Ayrıştırma sırasında çalıştığı için document.write betiği eşzamanlı ve sıralı ekler.
+if(document.readyState === "loading") document.write('<script src="osm-cache.js"><\/script>');
 (function(){
   // Yedek: 14 Ekim 2026, Kağıthane (41,08 K, 28,975 D), 18:00–24:00 saatlik toplamlar (mm), Open-Meteo
   const FALLBACK = {date:"2026-10-14", start:18, mm:[13.7,23.1,12.6,5.4,3.6,2.1], event:108.9, place:"Kağıthane", lat:41.080, lon:28.975};
