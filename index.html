@@ -232,6 +232,9 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   </div>
 
   <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="flowOn" checked> Akış animasyonu <span class="muted" style="font-weight:400">(suyun aktığı yön)</span></label>
+  <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:4px;cursor:pointer"><input type="checkbox" id="bldOn" checked> 3B binalar <span class="muted" style="font-weight:400">(OpenStreetMap)</span></label>
+  <label style="display:flex;gap:8px;align-items:center;font-size:12px;margin:0 0 4px 22px;cursor:pointer"><input type="checkbox" id="bldObs"> Su binaların etrafından aksın <span class="muted">(engel)</span></label>
+  <div id="bldInfo" class="muted" style="font-size:11px;margin:0 0 10px 22px"></div>
 
   <h2>Harita etiketleri</h2>
   <div class="lbls" id="lblToggles"></div>
@@ -242,7 +245,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   </div>
 
   <p class="note">
-    Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar ve dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
+    Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
     Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim
   </p>
 </aside>
@@ -460,7 +463,7 @@ async function loadTiles(z,cx,cy,size,urlFn,onProg){
 function ov(text,frac){ $("overlay").style.display="flex"; $("ovText").textContent=text; $("ovBar").style.width=((frac||0)*100)+"%"; }
 
 async function loadRegion(){
-  S.running=false; updPlay();
+  S.running=false; updPlay(); clearBuildings();
   $("play").disabled=$("reset").disabled=true;
   const zd=SIZES[S.size].z, n=2**zd, cx=lon2px(S.lon,n), cy=lat2py(S.lat,n);
   REG={zd,n,x0:cx-256,y0:cy-256};
@@ -668,15 +671,112 @@ async function baked(){
   if(BAKED && BAKED.k===p.k) return BAKED.js;
   try{ const r=await fetch(`data/${p.k}.json`); if(!r.ok) return null; BAKED={k:p.k,js:await r.json()}; return BAKED.js; }catch(e){ return null; }
 }
-async function overpass(q){
+async function overpass(q,ms=25000){
   for(let round=0;round<2;round++){
   if(round) await new Promise(r=>setTimeout(r,4000));
   for(const ep of OVERPASS){
-    const ac=new AbortController(), tm=setTimeout(()=>ac.abort(),25000);
+    const ac=new AbortController(), tm=setTimeout(()=>ac.abort(),ms);
     try{ const r=await fetch(ep+"?data="+encodeURIComponent(q),{signal:ac.signal}); if(r.ok){ clearTimeout(tm); return await r.json(); } }catch(e){}
     clearTimeout(tm);
   }}
   return null;
+}
+
+// ================= 3B binalar (OpenStreetMap) =================
+// Küçük bölgede tüm bölge; orta/geniş bölgede yalnızca yakınlaşınca kamera çevresi (~2,4 km) yüklenir.
+let bldMesh=null, bldGrid=null, bldWin=null, bldBusy=false, bldLastT=null, OBS=null, OBSK=1;
+const BLD_LV={house:2,detached:2,semidetached_house:2,terrace:3,bungalow:1,garage:1,garages:1,shed:1,hut:1,roof:1,kiosk:1,cabin:1,carport:1,
+  service:1,greenhouse:1,toilets:1,industrial:3,warehouse:3,retail:2,mosque:3,church:3,school:3,construction:3,university:4,
+  apartments:5,residential:5,commercial:5,hospital:5,office:6,hotel:6};
+function bldHeight(t){
+  const h=parseFloat(t.height); if(h>0) return Math.min(h,300);
+  const lv=parseFloat(t["building:levels"]); if(lv>0) return Math.min(lv,80)*3+(parseFloat(t["roof:levels"])||0)*2;
+  return (BLD_LV[t.building]||4)*3; // kat bilgisi yoksa tipik İstanbul binası: 4 kat
+}
+function clearBuildings(){
+  if(bldMesh){ scene.remove(bldMesh); bldMesh.geometry.dispose(); bldMesh=null; }
+  bldGrid=null; bldWin=null; updObs(); $("bldInfo").textContent="";
+}
+function updObs(){
+  OBS = ($("bldOn").checked && $("bldObs").checked && bldGrid) ? bldGrid : null;
+  if(OBS){ let c=0; for(let i=0;i<N*N;i++) c+=OBS[i]; OBSK=S.landN/Math.max(1,S.landN-c); }
+  if(bldMesh) bldMesh.visible=$("bldOn").checked;
+}
+$("bldOn").onchange=()=>{ updObs(); if(!$("bldOn").checked) $("bldInfo").textContent=""; else bldTick(); };
+$("bldObs").onchange=()=>{ updObs(); if($("bldObs").checked&&!bldGrid) bldTick(); };
+function bldTick(){
+  if(!S.loaded||!$("bldOn").checked||bldBusy) return;
+  if(S.size==="s"){ if(!bldWin) loadBuildings(null); return; }
+  const f=SIZE/(N-1), R=1200/S.cell, t=controls.target, gx=(t.x+SIZE/2)/f, gy=(t.z+SIZE/2)/f;
+  const moving=fly || (bldLastT && bldLastT.distanceTo(t)>0.3); bldLastT=t.clone();
+  if(camDist()>R*f*2.5){ if(!bldMesh) $("bldInfo").textContent="Binalar için yakınlaş (orta/geniş bölgede yalnızca yakın çevre yüklenir)."; return; }
+  if(moving || (bldWin && Math.hypot(gx-bldWin.cx,gy-bldWin.cy)<R*0.45)) return;
+  loadBuildings({cx:gx,cy:gy,R});
+}
+async function loadBuildings(win){
+  bldBusy=true; const reg=REG;
+  let bb;
+  if(!win){ const [[s,w],[n,e]]=regionBounds(S.lat,S.lon,S.size); bb=[s,w,n,e]; win={cx:N/2,cy:N/2,R:N}; }
+  else {
+    const a=px2ll(REG.x0+(win.cx-win.R)*2,REG.y0+(win.cy-win.R)*2,REG.n), c=px2ll(REG.x0+(win.cx+win.R)*2,REG.y0+(win.cy+win.R)*2,REG.n);
+    bb=[c.lat,a.lon,a.lat,c.lon];
+  }
+  $("bldInfo").textContent="Bina verisi indiriliyor…";
+  const js=await overpass(`[out:json][timeout:60];way["building"](${bb.map(v=>v.toFixed(5)).join(",")});out tags geom;`,60000);
+  bldBusy=false;
+  if(reg!==REG) return;
+  bldWin=win;
+  if(!js){ $("bldInfo").innerHTML=`OpenStreetMap sunucuları yoğun, binalar yüklenemedi. <button class="btn ghost sm" onclick="bldWin=null;bldTick()">Tekrar dene</button>`; return; }
+  buildBuildings(js.elements);
+}
+function buildBuildings(els){
+  const f=SIZE/(N-1), half=SIZE/2, pos=[], col=[], grid=new Uint8Array(N*N);
+  let cnt=0;
+  for(const el of els){
+    if(!el.geometry||el.geometry.length<4) continue;
+    const pts=el.geometry.map(p=>ll2grid(p.lat,p.lon));
+    const p0=pts[0], pn=pts[pts.length-1]; if(p0[0]===pn[0]&&p0[1]===pn[1]) pts.pop();
+    if(pts.length<3) continue;
+    let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9;
+    for(const p of pts){ mnx=Math.min(mnx,p[0]); mxx=Math.max(mxx,p[0]); mny=Math.min(mny,p[1]); mxy=Math.max(mxy,p[1]); }
+    if(mnx<0||mny<0||mxx>N-1||mxy>N-1) continue;
+    const cx=Math.round((mnx+mxx)/2), cy=Math.round((mny+mxy)/2);
+    if(sea[cy*N+cx]) continue;
+    // taban: ayak izi altındaki en düşük arazi (yamaçta havada kalmasın)
+    let base=1e9;
+    for(let y=Math.floor(mny);y<=Math.ceil(mxy);y++) for(let x=Math.floor(mnx);x<=Math.ceil(mxx);x++) base=Math.min(base,b[y*N+x]);
+    const top=base+bldHeight(el.tags||{}), bot=base-1;
+    const v2=pts.map(p=>new THREE.Vector2(p[0],p[1]));
+    if(THREE.ShapeUtils.isClockWise(v2)){ v2.reverse(); pts.reverse(); }
+    const sh=0.9+Math.random()*0.15, rc=[0.80*sh,0.77*sh,0.72*sh], wc=[0.68*sh,0.65*sh,0.61*sh];
+    const V=(p,h,c)=>{ pos.push(p[0]*f-half,h,p[1]*f-half); col.push(c[0],c[1],c[2]); };
+    for(const t of THREE.ShapeUtils.triangulateShape(v2,[])){ V(pts[t[0]],top,rc); V(pts[t[2]],top,rc); V(pts[t[1]],top,rc); }
+    for(let j=0;j<pts.length;j++){
+      const A=pts[j], B=pts[(j+1)%pts.length];
+      V(A,bot,wc); V(B,top,wc); V(B,bot,wc);
+      V(A,bot,wc); V(A,top,wc); V(B,top,wc);
+    }
+    // engel ızgarası: merkezi bina içinde kalan hücreler
+    for(let y=Math.ceil(mny);y<=Math.floor(mxy);y++) for(let x=Math.ceil(mnx);x<=Math.floor(mxx);x++){
+      let ins=false;
+      for(let a=0,c=pts.length-1;a<pts.length;c=a++){
+        const pa=pts[a], pc=pts[c];
+        if((pa[1]>y)!==(pc[1]>y) && x<(pc[0]-pa[0])*(y-pa[1])/(pc[1]-pa[1])+pa[0]) ins=!ins;
+      }
+      if(ins && !sea[y*N+x]) grid[y*N+x]=1;
+    }
+    cnt++;
+  }
+  if(bldMesh){ scene.remove(bldMesh); bldMesh.geometry.dispose(); }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute("color",new THREE.Float32BufferAttribute(col,3));
+  geo.computeVertexNormals();
+  bldMesh=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));
+  bldMesh.scale.y=sc()*S.ex; scene.add(bldMesh);
+  bldGrid=grid; updObs();
+  let bc=0; for(let i=0;i<N*N;i++) bc+=grid[i];
+  $("bldInfo").textContent=`${fmt(cnt)} bina${S.size==="s"?"":" (kamera çevresi)"} · bina kaplı alan: %${fmt(bc/S.landN*100,1)}`;
 }
 
 // ================= Simülasyon (virtual pipes) =================
@@ -689,12 +789,12 @@ function resetWater(){
   if(waterMesh){ updateWaterMesh(); drawDereOverlay(); }
 }
 function simStep(dt){
-  const l=S.cell, l2=l*l, C=dt*G*l, MN=dt*G*MANNING*MANNING/l;
+  const l=S.cell, l2=l*l, C=dt*G*l, MN=dt*G*MANNING*MANNING/l, O=OBS;
   for(let i=0;i<N*N;i++) H[i]=b[i]+d[i];
   for(let y=0;y<N;y++){
     for(let x=0;x<N;x++){
       const i=y*N+x;
-      if(sea[i]||d[i]<=0){fL[i]=fR[i]=fT[i]=fB[i]=0;continue;}
+      if(sea[i]||d[i]<=0||(O&&O[i])){fL[i]=fR[i]=fT[i]=fB[i]=0;continue;}
       const h=H[i];
       // Manning sürtünmesi (örtük): v = Q/(l·h), sürtünme ∝ g n² v / h^(4/3)
       const dep=d[i]>0.005?d[i]:0.005, fc=MN/(dep*Math.pow(dep,4/3));
@@ -703,13 +803,15 @@ function simStep(dt){
       let r=fR[i]/(1+fc*fR[i])+C*(h-hr); r=r>0?r:0;
       let t=fT[i]/(1+fc*fT[i])+C*(h-ht); t=t>0?t:0;
       let bb=fB[i]/(1+fc*fB[i])+C*(h-hb); bb=bb>0?bb:0;
+      if(O){ if(x>0&&O[i-1]) a=0; if(x<N-1&&O[i+1]) r=0; if(y>0&&O[i-N]) t=0; if(y<N-1&&O[i+N]) bb=0; }
       const sum=a+r+t+bb;
       if(sum>0){ const K=Math.min(1,d[i]*l2/(sum*dt)); a*=K;r*=K;t*=K;bb*=K; }
       fL[i]=a;fR[i]=r;fT[i]=t;fB[i]=bb;
     }
   }
   const raining = S.simT < S.durH*3600;
-  const rain = raining ? S.rate/1000/3600*dt : 0;
+  // binalar engelse çatıya düşen yağmur oluklardan sokağa iner: açık hücrelere paylaştır
+  const rain = raining ? S.rate/1000/3600*dt*(O?OBSK:1) : 0;
   const inf = S.inf/1000/3600*dt;
   const sw=S.sewer, toM=dt/1000/3600;
   const outStep=sw.out*toM, storeM=sw.store/1000;
@@ -719,6 +821,7 @@ function simStep(dt){
     for(let x=0;x<N;x++){
       const i=y*N+x;
       if(sea[i]) continue;
+      if(O&&O[i]){ d[i]=0; continue; }
       let inflow=0;
       if(x>0) inflow+=fR[i-1];
       if(x<N-1) inflow+=fL[i+1];
@@ -804,6 +907,7 @@ function rebuildTerrainZ(){
   const p=terrainMesh.geometry.attributes.position, k=sc()*S.ex;
   for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k);
   p.needsUpdate=true; terrainMesh.geometry.computeVertexNormals();
+  if(bldMesh) bldMesh.scale.y=k;
   updateWaterMesh();
 }
 async function applyTexture(){
@@ -1026,7 +1130,7 @@ renderer.domElement.addEventListener("mouseleave",()=>$("tip").style.display="no
 function resize(){ const w=view.clientWidth,h=view.clientHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
 addEventListener("resize",resize); resize();
 
-let last=performance.now(), statAcc=0;
+let last=performance.now(), statAcc=0, bldAcc=0;
 function loop(now){
   const rdt=Math.min(0.1,(now-last)/1000); last=now;
   if(S.running && S.loaded){
@@ -1046,6 +1150,7 @@ function loop(now){
   if(Math.abs(tg.x)>lim||Math.abs(tg.z)>lim){ const ox=tg.x, oz=tg.z; tg.x=Math.max(-lim,Math.min(lim,tg.x)); tg.z=Math.max(-lim,Math.min(lim,tg.z)); camera.position.x+=tg.x-ox; camera.position.z+=tg.z-oz; }
   updateRain(rdt);
   updateFlow(rdt);
+  bldAcc+=rdt; if(bldAcc>0.5){ bldAcc=0; bldTick(); }
   controls.update();
   updateLabels();
   renderer.render(scene,camera);
