@@ -36,6 +36,11 @@ h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mute
 input[type=range]{width:100%;accent-color:var(--accent)}
 select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
 .btns{display:flex;gap:8px;margin-top:6px}
+.live{display:flex;align-items:center;gap:6px;margin:8px 0 12px}
+.live #liveSt{flex:1;font-size:12.5px}
+.ib{width:34px;height:34px;flex:0 0 34px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer;font-size:15px;line-height:1}
+.ib:hover{border-color:var(--accent)}
+.ib:disabled{opacity:.4;cursor:default}
 .btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer;background:var(--accent);color:#04121f}
 .btns .btn{flex:1}
 .btn.ghost{background:var(--accent-soft);color:var(--accent)}
@@ -193,11 +198,11 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <h1>🌧️ İstanbul Sel Simülasyonu</h1>
   <p class="sub">Uydu yükseklik verisi (SRTM tabanlı DEM) üzerinde yağmur suyunun akışı ve birikmesi.</p>
 
-  <div class="btns" style="margin:0 0 4px">
-    <button class="btn" id="play" disabled style="padding:14px;font-size:16px">▶ Yağmuru başlat</button>
-    <button class="btn ghost" id="reset" disabled style="flex:0 0 56px;font-size:18px" title="Suyu sıfırla">↺</button>
+  <div class="live">
+    <span id="liveSt" class="muted">Yükleniyor…</span>
+    <button class="ib" id="play" disabled title="Duraklat">⏸</button>
+    <button class="ib" id="reset" disabled title="Baştan başlat">↺</button>
   </div>
-  <div id="liveSt" class="muted" style="font-size:12px;margin-bottom:12px">Yükleniyor…</div>
 
   <div class="region">
     <div class="ic">📍</div>
@@ -470,7 +475,7 @@ function uiUpd(){
 ["rate","dur","soil","spd","ex","sewer","blk"].forEach(id=>$(id).oninput=uiUpd); uiUpd();
 $("tex").onchange=applyTexture;
 $("play").onclick=()=>{ S.running=!S.running; updPlay(); };
-$("reset").onclick=()=>resetWater();
+$("reset").onclick=()=>{ resetWater(); S.running=S.loaded; updPlay(); }; // baştan başlat, yağmur hemen yeniden yağar
 $("showRoads").onchange=$("showWater").onchange=()=>drawDereOverlay();
 // Dere paneli: varsayılan kapalı (hap); masaüstünde son durum hatırlanır, telefonda hep kapalı başlar
 const MOBILE=matchMedia("(max-width:900px), (hover:none)").matches;
@@ -480,7 +485,7 @@ function setDerePanel(open){
 }
 { let open=false; try{ open=!MOBILE && localStorage.getItem("derePanelOpen")==="1"; }catch(e){} setDerePanel(open); }
 $("dereToggle").onclick=()=>setDerePanel($("derePanel").classList.contains("collapsed"));
-function updPlay(){ $("play").textContent=S.running?"⏸ Duraklat":(S.simT>0?"▶ Devam":"▶ Yağmuru başlat"); if(d) updStats(); }
+function updPlay(){ $("play").textContent=S.running?"⏸":"▶"; $("play").title=S.running?"Duraklat":"Devam et"; if(d) updStats(); }
 
 // ================= Veri yükleme =================
 function loadImg(url){
@@ -543,6 +548,7 @@ async function loadRegion(){
     resetWater(); buildScene();
     S.loaded=true; $("overlay").style.display="none";
     $("play").disabled=$("reset").disabled=false;
+    S.running=true; updPlay(); // başlat butonu yok: yeni bölge yüklenince yağmur kendiliğinden başlar
     loadLabels(true); // gömülü etiketler hemen; OSM etiketleri dere verisinden sonra
     loadDere().then(()=>loadLabels());
   }catch(e){
@@ -967,42 +973,57 @@ const SIZE=200;
 let terrainMesh, waterMesh, waterTex, waterData, terrainTex, dereMesh, dereTex, dereCanvas;
 function sc(){ return SIZE/(N*S.cell); }
 
-// ================= Deniz (dalgalı yüzey) =================
-function makeWaveNormals(){
-  // döşenebilir dalga yükseklik alanından normal haritası
-  const S2=256, h=new Float32Array(S2*S2), c=document.createElement("canvas"); c.width=c.height=S2;
-  const waves=[[3,1,1],[1,4,.7],[5,-2,.45],[-3,5,.35],[8,3,.2],[2,-9,.15],[11,7,.1]];
-  for(let y=0;y<S2;y++)for(let x=0;x<S2;x++){
-    let v=0; for(const [a,b2,amp] of waves) v+=amp*Math.sin(2*Math.PI*(a*x+b2*y)/S2+a*1.7);
-    h[y*S2+x]=v;
+// ================= Deniz (stilize su gölgelendiricisi) =================
+// R: deniz maskesi (kıyıda yumuşak), G: kıyıya uzaklık (0 kıyı → 1 açık deniz)
+const seaMaskData=new Uint8Array(N*N*4), seaMask=new THREE.DataTexture(seaMaskData,N,N,THREE.RGBAFormat);
+seaMask.magFilter=seaMask.minFilter=THREE.LinearFilter;
+function updateSeaMask(){
+  const dist=new Float32Array(N*N).fill(1e9), q=[];
+  for(let i=0;i<N*N;i++){ if(!sea[i]) continue; const x=i%N;
+    for(const j of [i-1,i+1,i-N,i+N]){ if(j<0||j>=N*N||Math.abs((j%N)-x)>1) continue; if(!sea[j]){ dist[i]=0; q.push(i); break; } } }
+  for(let h=0;h<q.length;h++){ const i=q[h], x=i%N;
+    for(const j of [i-1,i+1,i-N,i+N]){ if(j<0||j>=N*N||Math.abs((j%N)-x)>1||!sea[j]) continue; if(dist[j]>dist[i]+1){ dist[j]=dist[i]+1; q.push(j); } } }
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const i=y*N+x, o=((N-1-y)*N+x)*4;
+    let m=sea[i]?255:0;
+    if(!sea[i]){ let c=0; for(const j of [i-1,i+1,i-N,i+N]) if(j>=0&&j<N*N&&sea[j]) c++; m=c?Math.min(200,70*c):0; }
+    seaMaskData[o]=m; seaMaskData[o+1]=sea[i]?Math.min(255,dist[i]/22*255):0; seaMaskData[o+2]=0; seaMaskData[o+3]=255;
   }
-  const g=c.getContext("2d"), im=g.createImageData(S2,S2);
-  for(let y=0;y<S2;y++)for(let x=0;x<S2;x++){
-    const dx=h[y*S2+(x+1)%S2]-h[y*S2+(x+S2-1)%S2], dy=h[((y+1)%S2)*S2+x]-h[((y+S2-1)%S2)*S2+x];
-    const nx=-dx*1.6, ny=-dy*1.6, nz=1, l=Math.hypot(nx,ny,nz), o=(y*S2+x)*4;
-    im.data[o]=(nx/l*.5+.5)*255; im.data[o+1]=(ny/l*.5+.5)*255; im.data[o+2]=(nz/l*.5+.5)*255; im.data[o+3]=255;
-  }
-  g.putImageData(im,0,0);
-  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+  seaMask.needsUpdate=true;
 }
-const seaN1=makeWaveNormals(), seaN2=seaN1.clone(); seaN2.needsUpdate=true;
-seaN1.repeat.set(10,10); seaN2.repeat.set(17,17);
-const seaGeo=new THREE.PlaneGeometry(SIZE,SIZE,96,96);
-const seaMat=new THREE.MeshPhongMaterial({color:0x1b5a8c,emissive:0x041a2e,specular:0xcfe6ff,shininess:140,
-  normalMap:seaN1,normalScale:new THREE.Vector2(0.55,0.55),transparent:true,opacity:0.93,depthWrite:false});
-const seaMesh=new THREE.Mesh(seaGeo,seaMat); seaMesh.rotation.x=-Math.PI/2; seaMesh.renderOrder=0.5; seaMesh.visible=false; scene.add(seaMesh);
-const seaBase=Float32Array.from(seaGeo.attributes.position.array);
-function updateSea(t){
-  if(!seaMesh.visible) return;
-  seaN1.offset.set(t*0.012,t*0.007);
-  const p=seaGeo.attributes.position, a=p.array, amp=0.18;
-  for(let i=0;i<p.count;i++){
-    const x=seaBase[i*3], y=seaBase[i*3+1];
-    a[i*3+2]=amp*(Math.sin(x*0.35+t*1.3)+0.6*Math.sin(y*0.5-t*1.1)+0.3*Math.sin((x+y)*0.9+t*2.1));
-  }
-  p.needsUpdate=true;
-  seaMat.normalScale.set(0.45+0.15*Math.sin(t*0.6),0.45+0.15*Math.cos(t*0.5));
-}
+const seaMat=new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false,
+  uniforms:{uTime:{value:0}, uMask:{value:seaMask}},
+  vertexShader:`varying vec2 vUv; varying vec3 vW;
+    void main(){ vUv=uv; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+  fragmentShader:`uniform float uTime; uniform sampler2D uMask; varying vec2 vUv; varying vec3 vW;
+    void main(){
+      vec4 mk=texture2D(uMask,vUv); float m=mk.r; if(m<0.03) discard;
+      float dist=mk.g; vec2 p=vW.xz; float t=uTime;
+      // dalgacıklar: analitik eğim → normal
+      float gx=0.0, gz=0.0;
+      gx+=0.50*0.9*cos(p.x*0.9+p.y*0.25+t*1.1);       gz+=0.50*0.25*cos(p.x*0.9+p.y*0.25+t*1.1);
+      gx+=0.35*0.3*cos(p.x*0.3-p.y*1.2-t*0.8);        gz+=-0.35*1.2*cos(p.x*0.3-p.y*1.2-t*0.8);
+      gx+=0.18*2.1*cos((p.x+p.y)*2.1+t*1.9);          gz+=0.18*2.1*cos((p.x+p.y)*2.1+t*1.9);
+      gx+=0.10*3.4*cos((p.x-p.y*0.7)*3.4-t*2.6);      gz+=-0.10*2.38*cos((p.x-p.y*0.7)*3.4-t*2.6);
+      vec3 n=normalize(vec3(-gx*0.10,1.0,-gz*0.10));
+      vec3 V=normalize(cameraPosition-vW);
+      float fres=pow(1.0-max(dot(n,V),0.0),4.0);
+      vec3 shallow=vec3(0.16,0.58,0.66), mid=vec3(0.07,0.36,0.55), deep=vec3(0.03,0.17,0.34), sky=vec3(0.62,0.76,0.90);
+      vec3 col=mix(shallow,mid,smoothstep(0.0,0.25,dist)); col=mix(col,deep,smoothstep(0.25,0.9,dist));
+      col=mix(col,sky,clamp(fres*0.65,0.0,0.6));
+      vec3 L=normalize(vec3(-0.45,0.75,0.35)); vec3 H=normalize(L+V);
+      col+=vec3(1.0,0.97,0.9)*pow(max(dot(n,H),0.0),180.0)*0.8;
+      // kıyı köpüğü
+      float edge=dist+0.025*sin(t*1.6+p.x*2.3+p.y*1.7);
+      float foam=smoothstep(0.07,0.0,edge)*(0.55+0.45*sin(t*2.2+p.x*5.0-p.y*3.0));
+      col=mix(col,vec3(0.93,0.97,1.0),clamp(foam,0.0,1.0)*0.55);
+      gl_FragColor=vec4(col,m*0.94);
+    }`
+});
+const seaGeo=new THREE.PlaneGeometry(SIZE,SIZE,1,1);
+const seaMesh=new THREE.Mesh(seaGeo,seaMat); seaMesh.rotation.x=-Math.PI/2; seaMesh.position.y=0.02; seaMesh.renderOrder=0.5; seaMesh.visible=false; scene.add(seaMesh);
+function updateSea(t){ if(seaMesh.visible) seaMat.uniforms.uTime.value=t; }
 
 function buildScene(){
   [terrainMesh,waterMesh,dereMesh].forEach(m=>{ if(m){scene.remove(m);} });
@@ -1025,13 +1046,13 @@ function buildScene(){
   waterTex.magFilter=THREE.LinearFilter; waterTex.minFilter=THREE.LinearFilter;
   waterMesh=new THREE.Mesh(wg,new THREE.MeshPhongMaterial({map:waterTex,transparent:true,depthWrite:false,shininess:80,specular:0x333333}));
   waterMesh.rotation.x=-Math.PI/2; waterMesh.renderOrder=1; scene.add(waterMesh);
-  seaMesh.visible = sea.some(v=>v);
+  seaMesh.visible = sea.some(v=>v); updateSeaMask();
   rebuildTerrainZ(); drawDereOverlay();
   controls.target.set(0,0,0); camera.position.set(0,140,180);
 }
 function rebuildTerrainZ(){
   const p=terrainMesh.geometry.attributes.position, k=sc()*S.ex;
-  for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k);
+  for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k); // deniz tabanı sığ: duvar oluşmasın
   p.needsUpdate=true; terrainMesh.geometry.computeVertexNormals();
   if(bldMesh) bldMesh.scale.y=k;
   updateWaterMesh();
@@ -1128,7 +1149,7 @@ function updStats(){
   const raining=S.simT<S.durH*3600;
   $("liveSt").textContent = S.simT===0 ? `${S.name} · hazır` :
     `${raining?"🌧️":"☁️"} ${S.rate} mm/sa · ${$("sT").textContent}${S.running?"":" · duraklatıldı"}`;
-  $("hud").innerHTML = S.simT===0 ? `<b>${S.name}</b><br><span class="muted">Hazır · ▶ Yağmuru başlat</span>` :
+  $("hud").innerHTML = S.simT===0 ? `<b>${S.name}</b><br><span class="muted">Yağmur başlıyor…</span>` :
     (raining ? `🌧️ Yağıyor · <b>${S.rate} mm/sa</b>` : "☁️ Yağmur durdu · su çekiliyor/birikiyor") +
     (full>95 && raining ? `<br><span style="color:var(--warn)">⚠️ Kanalizasyon dolu, ızgaralar suyu alamıyor</span>` : "") +
     `<br><span class="muted">${S.name} · 1 hücre ≈ ${fmt(S.cell)} m</span>`;
@@ -1159,7 +1180,7 @@ function updDereStats(){
       <div class="cmp"><div class="t"><span>Bölgenin geneli su altında</span><b>${pct(lf)}</b></div><div class="g"><i style="width:${lf*100}%;background:var(--accent)"></i></div></div>
     </div>
     ${ratio>1.2 ? `<div class="big">Adında "dere" geçen yollar, bölgenin geneline göre <b>${fmt(ratio,1)} kat</b> daha sık su altında kalıyor.</div>`
-      : S.simT>0 ? `<div class="muted">Fark henüz belirgin değil, yağış sürdükçe izle.</div>` : `<div class="muted">Yağmuru başlat; bu yolların bölge geneline göre ne kadar su altında kaldığı burada karşılaştırılacak.</div>`}
+      : S.simT>0 ? `<div class="muted">Fark henüz belirgin değil, yağış sürdükçe izle.</div>` : `<div class="muted">Yağmur yağdıkça bu yolların bölge geneline göre ne kadar su altında kaldığı burada karşılaştırılacak.</div>`}
     ${top.length?`<div style="margin-top:6px;font-weight:600">En çok su basan "dere" yolları</div><ol>${top.map(o=>`<li>${o.name} <span>· ${o.max<1?fmt(o.max*100)+" cm":fmt(o.max,2)+" m"} · ${pct(o.wet/o.n)} su altında</span></li>`).join("")}</ol>`:""}
     <div class="muted" style="margin-top:6px">Eski dere yatakları çoğu zaman yola dönüşür; isim, suyun hâlâ oradan akmak istediğini ele verir.</div>`;
 }
