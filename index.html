@@ -25,6 +25,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="landmarks.js"></script>
+<script src="data/tr_il_ilce.js"></script>
+<script src="data/tr_daglar.js"></script>
 <style>
 :root{--bg:#0b0f15;--panel:#141a22;--panel2:#1b232d;--ink:#e6edf3;--muted:#8b98a5;--line:#28313c;--accent:#4ea8ff;--accent-soft:#16283f;--warn:#ff5c5c;--amber:#ffb020;--cyan:#22e0ff}
 *{box-sizing:border-box}
@@ -197,6 +199,18 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .pk-sel b{font-size:15px}
 .pk-go{padding:13px;font-size:15px;border-radius:12px}
 .pk-close{position:absolute;top:12px;right:12px}
+.pk-tabs{margin-bottom:10px}
+.pk-tab[hidden]{display:none}
+.pk-filter{width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:14px;margin-bottom:6px}
+.pk-list{max-height:280px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.pk-list button{display:flex;width:100%;gap:8px;justify-content:space-between;align-items:baseline;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);padding:9px 12px;cursor:pointer;font:inherit;font-size:13px}
+.pk-list button:last-child{border-bottom:0}
+.pk-list button:hover{background:var(--accent-soft)}
+.pk-list button.on{background:var(--accent-soft);font-weight:700}
+.pk-list button small{color:var(--muted);font-size:11px;white-space:nowrap}
+.pk-list .empty{padding:10px 12px;color:var(--muted);font-size:12px}
+.pk-crumb{display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:15px}
+.pk-crumb[hidden]{display:none}
 .leaflet-container{background:#111;font:inherit}
 .leaflet-tooltip{font-size:12px}
 </style>
@@ -209,7 +223,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <div class="pk-map">
       <div id="pmap"></div>
       <div class="pk-search">
-        <input id="q" placeholder="Semt, cadde ya da dere ara… (ör. Kağıthane)" autocomplete="off">
+        <input id="q" placeholder="Yer ara… (ör. Kağıthane, Fındıklı, Erciyes)" autocomplete="off">
         <div class="pk-results" id="qres" hidden></div>
       </div>
       <div class="pk-hint">Haritaya tıkla ya da kareyi sürükle → simülasyon alanı</div>
@@ -220,8 +234,25 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
         <p class="sub">Haritadan bir bölge seç; gerçek yükseklik verisi ve uydu görüntüsüyle 3B olarak açılacak.</p>
       </div>
       <div>
-        <div class="lbl">Taşkın riskli bilinen bölgeler</div>
-        <div class="cards" id="cards"></div>
+        <div class="seg pk-tabs" id="pkTabs">
+          <button data-t="cards" class="on">Öne çıkanlar<small>taşkın riskli</small></button>
+          <button data-t="il">İl / İlçe<small>81 il</small></button>
+          <button data-t="dag">Dağlar<small>zirveler</small></button>
+        </div>
+        <div class="pk-tab" id="tab-cards">
+          <div class="lbl">Taşkın riskli bilinen bölgeler</div>
+          <div class="cards" id="cards"></div>
+        </div>
+        <div class="pk-tab" id="tab-il" hidden>
+          <div class="pk-crumb" id="ilCrumb" hidden><button class="btn ghost sm" id="ilBack">← İller</button><b id="ilName"></b></div>
+          <input class="pk-filter" id="ilQ" placeholder="İl ara… (ör. Rize)" autocomplete="off">
+          <div class="pk-list" id="ilList"></div>
+        </div>
+        <div class="pk-tab" id="tab-dag" hidden>
+          <input class="pk-filter" id="dagQ" placeholder="Dağ ya da il ara… (ör. Erciyes)" autocomplete="off">
+          <div class="pk-list" id="dagList"></div>
+          <div class="muted" style="font-size:10.5px;margin-top:6px">Dağlarda alan otomatik olarak “Geniş” seçilir; yamaçlar sığsın.</div>
+        </div>
       </div>
       <div>
         <div class="lbl">Alan büyüklüğü</div>
@@ -326,7 +357,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <p class="note">
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür; kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
-    Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim
+    Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı
   </p>
 </div>
 </aside>
@@ -450,7 +481,7 @@ pmap.on("click",e=>pickSet(e.latlng.lat,e.latlng.lng,"Seçili alan"));
 function pickSet(lat,lon,name,fly){
   P.lat=lat; P.lon=lon; P.name=name;
   prect.setBounds(regionBounds(lat,lon,P.size));
-  if(fly) pmap.flyToBounds(prect.getBounds(),{padding:[40,40],duration:.8});
+  if(fly){ pmap.invalidateSize(); const z=pmap.getSize(); if(z.x&&z.y&&!$("picker").hidden) pmap.flyToBounds(prect.getBounds(),{padding:[40,40],duration:.8}); } // boyutsuz (gizli) haritada uçuş NaN üretir
   document.querySelectorAll(".pc").forEach(c=>c.classList.toggle("on",c.dataset.n===name));
   updPickInfo();
 }
@@ -485,7 +516,7 @@ async function search(){
   const q=$("q").value.trim(); const box=$("qres");
   if(q.length<3){ box.hidden=true; return; }
   try{
-    const url=`https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=tr&viewbox=27.95,41.60,29.95,40.75&bounded=1&q=${encodeURIComponent(q)}`;
+    const url=`https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=tr&countrycodes=tr&viewbox=25.6,42.2,44.9,35.8&bounded=1&q=${encodeURIComponent(q)}`;
     const r=await (await fetch(url)).json();
     box.innerHTML = r.length ? "" : `<button disabled>Sonuç yok</button>`;
     r.forEach(it=>{
@@ -498,12 +529,52 @@ async function search(){
   }catch(e){ box.innerHTML=`<button disabled>Arama yapılamadı</button>`; box.hidden=false; }
 }
 
+// sekmeler: öne çıkanlar · il/ilçe · dağlar (veri: data/tr_il_ilce.js, data/tr_daglar.js)
+const trKey=s=>s.toLocaleLowerCase("tr-TR").replace(/[çğıöşüâîû]/g,c=>({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u",â:"a",î:"i",û:"u"})[c]);
+$("pkTabs").querySelectorAll("button").forEach(bt=>bt.onclick=()=>{
+  $("pkTabs").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===bt));
+  ["cards","il","dag"].forEach(t=>$("tab-"+t).hidden=t!==bt.dataset.t);
+});
+function setSize(k){ P.size=k; [...$("segSize").children].forEach(x=>x.classList.toggle("on",x.dataset.k===k)); }
+function pkList(el,items,q){ // items: [{t, s, k, go}]
+  const key=trKey(q.trim()), hit=items.filter(it=>!key||it.k.includes(key));
+  el.innerHTML=hit.length?"":`<div class="empty">Sonuç yok</div>`;
+  for(const it of hit){
+    const bt=document.createElement("button"); bt.innerHTML=`<span>${it.t}</span><small>${it.s||""}</small>`;
+    bt.onclick=()=>{ [...el.children].forEach(x=>x.classList.toggle("on",x===bt)); it.go(); };
+    el.appendChild(bt);
+  }
+}
+const IL=(window.TR_IL_ILCE||{il:[]}).il;
+let ilSel=null;
+function ilRender(){
+  if(!ilSel){
+    pkList($("ilList"),IL.map(p=>({t:p.n,s:`${p.plaka} · ${p.ilce.length} ilçe`,k:trKey(p.n+" "+p.plaka),
+      go:()=>{ ilSel=p; $("ilQ").value=""; ilRender(); pickSet(p.lat,p.lon,p.n,true); }})),$("ilQ").value);
+  } else {
+    pkList($("ilList"),[{n:ilSel.n,lat:ilSel.lat,lon:ilSel.lon,c:1},...ilSel.ilce].map(d=>({t:d.n,s:d.c?"il merkezi":"",k:trKey(d.n),
+      go:()=>pickSet(d.lat,d.lon,d.c?ilSel.n:`${d.n}, ${ilSel.n}`,true)})),$("ilQ").value);
+  }
+  $("ilCrumb").hidden=!ilSel; $("ilName").textContent=ilSel?ilSel.n:"";
+  $("ilQ").placeholder=ilSel?`${ilSel.n} ilçelerinde ara…`:"İl ara… (ör. Rize)";
+}
+$("ilQ").addEventListener("input",ilRender);
+$("ilBack").onclick=()=>{ ilSel=null; $("ilQ").value=""; ilRender(); };
+ilRender();
+const DAG=(window.TR_DAGLAR||{dag:[]}).dag;
+function dagRender(){
+  pkList($("dagList"),DAG.map(m=>({t:m.n,s:`${m.il} · ${fmt(m.ele)} m`,k:trKey(m.n+" "+m.il),
+    go:()=>{ setSize("l"); pickSet(m.lat,m.lon,m.n,true); }})),$("dagQ").value);
+}
+$("dagQ").addEventListener("input",dagRender);
+dagRender();
+
 function openPicker(){ $("picker").hidden=false; $("pkCancel").hidden=!S.loaded; setTimeout(()=>pmap.invalidateSize(),50); }
 $("openPicker").onclick=openPicker;
-$("pkCancel").onclick=()=>$("picker").hidden=true;
+$("pkCancel").onclick=()=>{ pmap.stop(); $("picker").hidden=true; }; // gizli haritada uçuş animasyonu NaN üretir
 $("goBtn").onclick=()=>{
   Object.assign(S,{lat:P.lat,lon:P.lon,name:P.name,size:P.size,q:P.q});
-  $("picker").hidden=true; loadRegion();
+  pmap.stop(); $("picker").hidden=true; loadRegion();
 };
 
 // ================= Kontroller =================
