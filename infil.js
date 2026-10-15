@@ -173,13 +173,13 @@
   const STOPS=[[0,[90,30,30]],[.2,[200,86,42]],[.4,[233,196,106]],[.6,[124,196,127]],[.8,[42,157,143]],[1,[29,95,168]]];
   const col=f=>{ const t=Math.max(0,Math.min(1,Math.log10(Math.max(f,1))/2)); let k=1; while(k<STOPS.length-1&&STOPS[k][0]<t) k++;
     const [a,ca]=STOPS[k-1], [b2,cb]=STOPS[k], u=(t-a)/(b2-a); return ca.map((v,j)=>v+(cb[j]-v)*u); };
-  let cnv=null, lastX=null;
+  let cnv=null, lastX=null, VIEW="now";
   window.infCanvas=()=>{
     if(!M.ok||M.reg!==REG) return null;
     const sm=document.createElement("canvas"); sm.width=sm.height=N; const g=sm.getContext("2d"), im=g.createImageData(N,N);
     for(let i=0;i<N*N;i++){ const o=i*4;
       if(sea[i]){ im.data[o]=20; im.data[o+1]=40; im.data[o+2]=70; im.data[o+3]=255; continue; }
-      const c=col(capAt(i)); im.data[o]=c[0]; im.data[o+1]=c[1]; im.data[o+2]=c[2]; im.data[o+3]=255; }
+      const c=col(VIEW==="dry"?M.fc[i]+M.dd[i]:capAt(i)); im.data[o]=c[0]; im.data[o+1]=c[1]; im.data[o+2]=c[2]; im.data[o+3]=255; }
     g.putImageData(im,0,0);
     const W=satCanvas?Math.min(1024,satCanvas.width):512;
     cnv=document.createElement("canvas"); cnv.width=cnv.height=W; const h=cnv.getContext("2d");
@@ -194,5 +194,43 @@
   setInterval(()=>{ if(S.loaded&&$("tex").value==="inf") refresh(false); },1500);
   const onSel=()=>{ if(need()&&S.loaded&&(!M.ok||M.reg!==REG)) prep(); if(M.ok&&!M.up&&M.upGeo) upPrep2(); ui(); };
   $("soil").addEventListener("change",onSel); $("tex").addEventListener("change",onSel);
+  // ön yüzde kısa yol: sol panelde bölge kartının altında düğme ve Dere izleri panelinde katman kutusu (Görünüm seçimiyle eşli)
+  let texPrev="sat";
+  const setLayer=on=>{ const t=$("tex"), cur=t.value;
+    if(on===(cur==="inf")) return;
+    if(on){ texPrev=cur; t.value="inf"; } else t.value=texPrev!=="inf"?texPrev:(satCanvas?"sat":"elev");
+    t.dispatchEvent(new Event("change")); };
+  const css=document.createElement("style");
+  css.textContent=`#infBtn{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;text-align:left;justify-content:flex-start}
+    #infBtn .sw{width:28px;height:8px;border-radius:4px;background:linear-gradient(90deg,#5a1e1e,#c8562a,#e9c46a,#7cc47f,#2a9d8f,#1d5fa8);flex:none}
+    #infBtn small{margin-left:auto;font-weight:500;opacity:.8}
+    #infBtn[aria-pressed="true"]{background:var(--accent);color:#04121f}`;
+  document.head.appendChild(css);
+  css.textContent+=`#infView{display:flex;gap:6px;margin-top:6px}#infView[hidden]{display:none}#infView button{flex:1}
+    #infView button[aria-pressed="true"]{background:var(--accent);color:#04121f}
+    @media (max-width:900px){#infBtn{width:auto;margin:0;padding:6px 9px;flex:none}#infBtn .sw,#infBtn .lt{display:none}#infView,#infView:not([hidden]){display:none}}`;
+  const btn=document.createElement("button"); btn.id="infBtn"; btn.className="btn ghost sm"; btn.type="button";
+  btn.title="Her noktada zeminin şu an saatte kaç mm su emdiğini renklerle göster (uydu arazi örtüsü + toprak haritası)";
+  btn.innerHTML=`<span class="sw"></span>🌱<span class="lt"> Zemin emişi haritası</span><small></small>`;
+  const vw=document.createElement("div"); vw.id="infView"; vw.hidden=true;
+  vw.innerHTML=`<button type="button" class="btn ghost sm" data-v="now" title="Simülasyondaki ıslaklıkla, şu anki emiş">Şu an</button>`+
+    `<button type="button" class="btn ghost sm" data-v="dry" title="Zemin kuruyken emiş: arazi örtüsü ve toprak farkı en iyi böyle görünür">Kuruyken</button>`;
+  const reg=document.querySelector("aside .region"); if(reg){ reg.after(btn); btn.after(vw); }
+  vw.onclick=e=>{ const v=e.target.dataset&&e.target.dataset.v; if(!v||v===VIEW) return; VIEW=v; sync(); if($("tex").value==="inf") applyTexture(); };
+  // telefonda yer dar: düğme kapalı → şu an → kuruyken → kapalı döner
+  const NARROW=matchMedia("(max-width:900px)");
+  btn.onclick=()=>{ const on=$("tex").value==="inf";
+    if(NARROW.matches&&on&&VIEW==="now"){ VIEW="dry"; sync(); applyTexture(); return; }
+    if(NARROW.matches&&!on) VIEW="now";
+    setLayer(!on); };
+  const lab=document.createElement("label");
+  lab.innerHTML=`<input type="checkbox" id="showInf"> <span class="sw" style="background:linear-gradient(90deg,#c8562a,#7cc47f,#1d5fa8)"></span> Zemin emişi <span class="muted">(şu an, mm/sa)</span>`;
+  const up=$("showUp"); if(up&&up.closest("label")) up.closest("label").after(lab);
+  $("showInf").onchange=e=>setLayer(e.target.checked);
+  const sync=()=>{ const on=$("tex").value==="inf"; btn.setAttribute("aria-pressed",on); $("showInf").checked=on;
+    btn.querySelector("small").textContent=NARROW.matches ? (on?(VIEW==="dry"?" kuru":" şu an"):" zemin") : on?"açık":"göster"; vw.hidden=!on;
+    vw.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===VIEW));
+    const t=$("lgInf").firstElementChild; if(t) t.textContent=VIEW==="dry"?"Zemin emişi (kuruyken)":"Zemin emişi (şu an)"; };
+  $("tex").addEventListener("change",sync); sync();
   if(need()) onSel();
 })();

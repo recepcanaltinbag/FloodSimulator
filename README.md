@@ -52,7 +52,7 @@ Her şey tarayıcıda, JavaScript ve Three.js ile hesaplanır; sunucu tarafı yo
 
 ## Zemin emişi haritası
 
-Ayarlarda **Zemin → "Haritadan (arazi örtüsü + toprak)"** seçilince her hücre kendi Horton eğrisini kullanır: f = fc + (f0 − fc)·e^(−x). Islaklık x "Önceki günler" ile başlar ve sonra her hücrede ayrı ilerler (aşağıya bakın). Görünüm → **"Zemin emişi haritası"** anlık emişi renklendirir; fare ipucu hücrenin arazi örtüsünü, toprağını ve şu anki emişini yazar. Varsayılan seçim değişmedi (Beton / asfalt + Doygun).
+Ayarlarda **Zemin → "Haritadan (arazi örtüsü + toprak)"** seçilince her hücre kendi Horton eğrisini kullanır: f = fc + (f0 − fc)·e^(−x). Islaklık x "Önceki günler" ile başlar ve sonra her hücrede ayrı ilerler (aşağıya bakın). Sol paneldeki **🌱 Zemin emişi haritası** düğmesi (ya da Görünüm menüsü, Dere izleri paneli) emişi renklendirir: "Şu an" simülasyondaki ıslaklıkla, "Kuruyken" arazi örtüsü ve toprak farkını en iyi gösterir; fare ipucu hücrenin arazi örtüsünü, toprağını ve şu anki emişini yazar. Varsayılan seçim değişmedi (Beton / asfalt + Doygun).
 
 Her hücre için üç bilgi birleştirilir:
 
