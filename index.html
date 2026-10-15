@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="landmarks.js"></script>
 <style>
 :root{--bg:#0b0f15;--panel:#141a22;--panel2:#1b232d;--ink:#e6edf3;--muted:#8b98a5;--line:#28313c;--accent:#4ea8ff;--accent-soft:#16283f;--warn:#ff5c5c;--amber:#ffb020;--cyan:#22e0ff}
 *{box-sizing:border-box}
@@ -132,7 +133,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 <body>
 
 <!-- ============ Bölge seçim ekranı ============ -->
-<div id="picker">
+<div id="picker" hidden>
   <div class="pk">
     <div class="pk-map">
       <div id="pmap"></div>
@@ -171,6 +172,12 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <h1>🌧️ İstanbul Sel Simülasyonu</h1>
   <p class="sub">Uydu yükseklik verisi (SRTM tabanlı DEM) üzerinde yağmur suyunun akışı ve birikmesi.</p>
 
+  <div class="btns" style="margin:0 0 4px">
+    <button class="btn" id="play" disabled style="padding:14px;font-size:16px">▶ Yağmuru başlat</button>
+    <button class="btn ghost" id="reset" disabled style="flex:0 0 56px;font-size:18px" title="Suyu sıfırla">↺</button>
+  </div>
+  <div id="liveSt" class="muted" style="font-size:12px;margin-bottom:12px">Yükleniyor…</div>
+
   <div class="region">
     <div class="ic">📍</div>
     <div><b id="regName">—</b><small id="regInfo"></small></div>
@@ -185,7 +192,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   </div>
   <div class="ctrl">
     <label>Yağış süresi <span id="durV"></span></label>
-    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="3">
+    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="2">
   </div>
   <div class="ctrl">
     <label>Zemin (suyu emme)</label>
@@ -238,11 +245,6 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <h2>Harita etiketleri</h2>
   <div class="lbls" id="lblToggles"></div>
-
-  <div class="btns">
-    <button class="btn" id="play" disabled>▶ Yağmuru başlat</button>
-    <button class="btn ghost" id="reset" disabled style="flex:0 0 52px">↺</button>
-  </div>
 
   <p class="note">
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
@@ -422,6 +424,7 @@ $("goBtn").onclick=()=>{
 // ================= Kontroller =================
 SCEN.forEach(s=>{
   const c=document.createElement("button"); c.className="chip"; c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
+  if(s.n==="Sağanak") c.classList.add("on"); // varsayılan senaryo
   c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; uiUpd(); document.querySelectorAll("#scen .chip").forEach(x=>x.classList.toggle("on",x===c)); };
   $("scen").appendChild(c);
 });
@@ -442,7 +445,7 @@ $("tex").onchange=applyTexture;
 $("play").onclick=()=>{ S.running=!S.running; updPlay(); };
 $("reset").onclick=()=>resetWater();
 $("showRoads").onchange=$("showWater").onchange=()=>drawDereOverlay();
-function updPlay(){ $("play").textContent=S.running?"⏸ Duraklat":(S.simT>0?"▶ Devam":"▶ Yağmuru başlat"); }
+function updPlay(){ $("play").textContent=S.running?"⏸ Duraklat":(S.simT>0?"▶ Devam":"▶ Yağmuru başlat"); if(d) updStats(); }
 
 // ================= Veri yükleme =================
 function loadImg(url){
@@ -453,6 +456,8 @@ async function loadTiles(z,cx,cy,size,urlFn,onProg){
   const tx0=Math.floor(x0/256), ty0=Math.floor(y0/256), tx1=Math.floor((x0+size-1)/256), ty1=Math.floor((y0+size-1)/256);
   const cnv=document.createElement("canvas"); cnv.width=cnv.height=size;
   const g=cnv.getContext("2d");
+  // yükseklik karoları RGB ile kodlanır: yumuşatma dikişlerde sahte duvar/hendek üretir
+  if(urlFn===DEM_URL) g.imageSmoothingEnabled=false;
   const total=(tx1-tx0+1)*(ty1-ty0+1); let done=0;
   const jobs=[];
   for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++)
@@ -465,13 +470,14 @@ function ov(text,frac){ $("overlay").style.display="flex"; $("ovText").textConte
 async function loadRegion(){
   S.running=false; updPlay(); clearBuildings();
   $("play").disabled=$("reset").disabled=true;
-  const zd=SIZES[S.size].z, n=2**zd, cx=lon2px(S.lon,n), cy=lat2py(S.lat,n);
+  const zd=SIZES[S.size].z, n=2**zd, cx=Math.round(lon2px(S.lon,n)), cy=Math.round(lat2py(S.lat,n)); // tam piksel: karolar kaymasın
   REG={zd,n,x0:cx-256,y0:cy-256};
   $("regName").textContent=S.name;
   $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
   try{
-    ov("Yükseklik verisi indiriliyor…",0);
-    const demC=await loadTiles(zd,cx,cy,512,DEM_URL,f=>ov("Yükseklik verisi indiriliyor…",f*0.2));
+    const lt=`${S.name.replace(/ Deresi$/,"")} yükleniyor · yükseklik verisi…`;
+    ov(lt,0);
+    const demC=await loadTiles(zd,cx,cy,512,DEM_URL,f=>ov(lt,f*0.2));
     const px=demC.getContext("2d").getImageData(0,0,512,512).data;
     b=new Float32Array(N*N);
     for(let y=0;y<N;y++)for(let x=0;x<N;x++){
@@ -482,9 +488,10 @@ async function loadRegion(){
       }
       b[y*N+x]=s/4;
     }
+    sea=new Uint8Array(N*N); for(let i=0;i<N*N;i++) sea[i]=b[i]<=0.3?1:0;
+    fillVoids();
     b=smoothDEM(b);
     S.cell=156543.03*Math.cos(S.lat*Math.PI/180)/n*2;
-    sea=new Uint8Array(N*N); for(let i=0;i<N*N;i++) sea[i]=b[i]<=0.3?1:0;
     S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
     elevCanvas=makeElevCanvas();
 
@@ -501,9 +508,39 @@ async function loadRegion(){
     resetWater(); buildScene();
     S.loaded=true; $("overlay").style.display="none";
     $("play").disabled=$("reset").disabled=false;
-    loadDere().then(loadLabels);
+    loadLabels(true); // gömülü etiketler hemen; OSM etiketleri dere verisinden sonra
+    loadDere().then(()=>loadLabels());
   }catch(e){
     console.error(e); ov("Veri indirilemedi (internet bağlantısını kontrol et).",0);
+  }
+}
+// Kenara değmeyen küçük "deniz" adacıkları DEM boşluğudur: karaya çevir, komşulardan doldur
+function fillVoids(){
+  const comp=new Int32Array(N*N).fill(-1), stack=[], fill=[];
+  for(let s0=0;s0<N*N;s0++){
+    if(!sea[s0]||comp[s0]>=0) continue;
+    const cells=[]; let edge=false; stack.push(s0); comp[s0]=s0;
+    while(stack.length){
+      const i=stack.pop(), x=i%N, y=(i-x)/N; cells.push(i);
+      if(x===0||y===0||x===N-1||y===N-1) edge=true;
+      for(const j of [x>0?i-1:-1, x<N-1?i+1:-1, y>0?i-N:-1, y<N-1?i+N:-1])
+        if(j>=0&&sea[j]&&comp[j]<0){ comp[j]=s0; stack.push(j); }
+    }
+    if(!edge&&cells.length<300) for(const i of cells){ sea[i]=0; fill.push(i); }
+  }
+  const done=new Uint8Array(N*N).fill(1); for(const i of fill) done[i]=0;
+  let left=fill;
+  while(left.length){
+    const next=[], upd=[];
+    for(const i of left){
+      const x=i%N; let s=0,c=0;
+      for(const j of [x>0?i-1:-1, x<N-1?i+1:-1, i>=N?i-N:-1, i<N*N-N?i+N:-1])
+        if(j>=0&&done[j]&&!sea[j]){ s+=b[j]; c++; }
+      if(c) upd.push([i,s/c]); else next.push(i);
+    }
+    if(!upd.length) break;
+    for(const [i,v] of upd){ b[i]=Math.max(v,0.5); done[i]=1; }
+    left=next;
   }
 }
 function smoothDEM(a){
@@ -611,7 +648,7 @@ function lcat(t){
   if(t.highway) return "road";
   return null;
 }
-async function loadLabels(){
+async function loadLabels(staticOnly){
   LABELS.forEach(l=>l.el.remove()); LABELS=[];
   Object.keys(LCATS).forEach(k=>$("lc-"+k).textContent="");
   const [[s,w],[nn,e]]=regionBounds(S.lat,S.lon,S.size), bb=`(${s},${w},${nn},${e})`;
@@ -623,24 +660,34 @@ async function loadLabels(){
     nwr["amenity"="place_of_worship"]["name"]["wikidata"]${bb};
     way["highway"~"^(motorway|trunk|primary)$"]["name"]${bb};
   );out center tags;`;
-  const bk=await baked();
-  const js=bk ? {elements:bk.labels} : await overpass(q); if(!js) return;
-  const seen=new Set(), cnt={};
-  for(const el of js.elements){
-    const t=el.tags||{}, name=t["name:tr"]||t.name, cat=lcat(t);
-    const lat=el.lat??el.center?.lat, lon=el.lon??el.center?.lon;
-    if(!name||!cat||lat==null) continue;
-    const key=cat+name; if(seen.has(key)) continue; seen.add(key);
-    const g=ll2grid(lat,lon); if(g[0]<1||g[1]<1||g[0]>N-2||g[1]>N-2) continue;
+  const seen=new Set(), cnt={}, reg=REG;
+  const add=(cat,name,lat,lon,pr)=>{
+    if(!name||!LCATS[cat]||lat==null) return;
+    const key=cat+name; if(seen.has(key)) return;
+    const g=ll2grid(lat,lon); if(g[0]<1||g[1]<1||g[0]>N-2||g[1]>N-2) return;
+    seen.add(key);
     const el2=document.createElement("div"); el2.className="lb c-"+cat;
     el2.textContent=(LCATS[cat].ic?LCATS[cat].ic+" ":"")+name;
     $("labels").appendChild(el2);
-    LABELS.push({cat,name,g,el:el2,pr:LCATS[cat].pr+(t.wikidata?0:0.5),w:0,h:0});
+    LABELS.push({cat,name,g,el:el2,pr,w:0,h:0});
     cnt[cat]=(cnt[cat]||0)+1;
+  };
+  // gömülü liste (landmarks.js): Overpass yanıt vermese de görünür, öncelikli
+  for(const l of (window.STATIC_LABELS||[])) add(l.c,l.n,l.lat,l.lon,(LCATS[l.c]?.pr??0)-0.25);
+  const finish=()=>{
+    LABELS.sort((a,b)=>a.pr-b.pr);
+    LABELS.forEach(l=>{ l.el.style.display="block"; l.w=l.el.offsetWidth; l.h=l.el.offsetHeight; l.el.style.display="none"; });
+    Object.keys(LCATS).forEach(k=>$("lc-"+k).textContent=cnt[k]||"");
+  };
+  finish(); if(staticOnly) return;
+  const bk=await baked();
+  const js=bk ? {elements:bk.labels} : await overpass(q);
+  if(!js||reg!==REG) return;
+  for(const el of js.elements){
+    const t=el.tags||{};
+    add(lcat(t),t["name:tr"]||t.name,el.lat??el.center?.lat,el.lon??el.center?.lon,(LCATS[lcat(t)]?.pr??0)+(t.wikidata?0:0.5));
   }
-  LABELS.sort((a,b)=>a.pr-b.pr);
-  LABELS.forEach(l=>{ l.el.style.display="block"; l.w=l.el.offsetWidth; l.h=l.el.offsetHeight; l.el.style.display="none"; });
-  Object.entries(cnt).forEach(([k,v])=>$("lc-"+k).textContent=v);
+  finish();
 }
 const _v=new THREE.Vector3();
 function updateLabels(){
@@ -1000,6 +1047,8 @@ function updStats(){
   $("gS").style.width=full+"%"; $("gS").style.background = full>95?"var(--warn)":full>70?"var(--amber)":"var(--accent)";
   $("sK").textContent = S.drained>1e6 ? fmt(S.drained/1e6,2)+" milyon m³" : fmt(S.drained)+" m³";
   const raining=S.simT<S.durH*3600;
+  $("liveSt").textContent = S.simT===0 ? `${S.name} · hazır` :
+    `${raining?"🌧️":"☁️"} ${S.rate} mm/sa · ${$("sT").textContent}${S.running?"":" · duraklatıldı"}`;
   $("hud").innerHTML = S.simT===0 ? `<b>${S.name}</b><br><span class="muted">Hazır · ▶ Yağmuru başlat</span>` :
     (raining ? `🌧️ Yağıyor · <b>${S.rate} mm/sa</b>` : "☁️ Yağmur durdu · su çekiliyor/birikiyor") +
     (full>95 && raining ? `<br><span style="color:var(--warn)">⚠️ Kanalizasyon dolu, ızgaralar suyu alamıyor</span>` : "") +
@@ -1169,6 +1218,9 @@ $("nIn").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle
 $("nOut").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.min(500,camDist()*1.6));
 $("nTop").onclick=()=>setView(0.01,controls.getAzimuthalAngle(),camDist());
 $("nHome").onclick=()=>setView(Math.atan2(180,140),0,Math.hypot(140,180),new THREE.Vector3());
+
+// İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, Sağanak) yüklenir ve yağmur kendiliğinden başlar
+loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 </script>
 </body>
 </html>
