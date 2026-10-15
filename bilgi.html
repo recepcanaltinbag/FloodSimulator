@@ -132,6 +132,17 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:14px;paddin
 </table></div>
 <p>Bu değerler literatürdeki tipik aralıklardan seçilmiş kaba değerler; İstanbul için ölçülmüş değil. Şehirde değerler düşük, çünkü yüzeyin büyük kısmı beton ve asfalt.</p>
 <p><b>Önceki günler</b> seçeneği zeminin başlangıçtaki ıslaklığını belirler: kuru, nemli ya da doygun. 14 Ekim'de sabahtan beri yağdığı için o senaryo doygun zeminle başlar.</p>
+<h3>Haritadan gelen emiş</h3>
+<p>Yukarıdaki dört seçenekte bütün alan aynı zemin sayılır. <b>Haritadan (arazi örtüsü + toprak)</b> seçeneğinde ise her hücre kendi zeminini alır. Bunun için üç açık veri birleştirilir:</p>
+<ul>
+<li><b>Arazi örtüsü:</b> ESA WorldCover. Bu harita uydu görüntülerinden yapılmıştır ve 10 metrede bir orman, çayır, tarla ya da yapı olduğunu söyler.</li>
+<li><b>Toprak dokusu:</b> SoilGrids. Toprağın ne kadar kum ve kil içerdiğini tahmin eder. Kumlu toprak suyu hızlı, killi toprak yavaş geçirir.</li>
+<li><b>Kayaç:</b> GLiM. Kireçtaşı gibi karbonatlı kayaları gösterir, ama çok kabadır (yaklaşık 50 km'lik kareler).</li>
+</ul>
+<p>Toprak, doyunca ne kadar emeceğini belirler. Bitki örtüsü kuruyken emişi artırır: kuru toprak ormanın altında, çıplak haline göre yaklaşık iki kat hızlı emer. Yapı ve yol olan kısım beton gibi sayılır. Değerler hidroloji kitaplarındaki tablolardan alınmıştır (Rawls vd. 1983; Akan 1993).</p>
+<p>Suyun yolu da önemli. Betondan akan su yamaçtan aşağı inip bir ormana ya da çayıra girerse orada emilmeye devam eder. Buna <b>run-on</b> (üstten gelen suyun emilmesi) denir. Her hücre kendi aldığı suyla ıslanır: yamaçtan su alan vadi tabanı ya da orman kenarı çabuk doyar, yalnız yağmur alan tepe daha geç doyar.</p>
+<p>Görünüm menüsündeki <b>Zemin emişi haritası</b> her hücrenin o anki emişini renklerle gösterir. Fareyi bir noktada tutunca o hücrenin zemini ve şu an saatte kaç mm emdiği yazar.</p>
+<p>Bu harita da bir tahmindir. Kentlerde toprak ölçümü yoktur; değer çevredeki tahminlerden doldurulur. Karst alanlarında harita emişi büyük olasılıkla az gösterir; orada asıl araç karst modudur.</p>
 </section>
 
 <section id="kanal">

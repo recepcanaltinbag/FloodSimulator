@@ -6,7 +6,7 @@ Bunlar model içi karşılaştırmalardır, ölçümle doğrulama değildir.
 
 ## Kağıthane
 
-Ayarlar: Orta boy (hücre ≈ 29 m), 40 mm/sa · 3 sa, standart şebeke, havzadan gelen su açık. Değerler 3 saatin sonundadır.
+Ayarlar: Orta boy (hücre ≈ 29 m), 40 mm/sa · 3 sa, standart şebeke, havzadan gelen su açık. Değerler 3 saatin sonundadır. Bu ve Taşeli tablosu ilk sürümle (ıslaklık pencerede ortak) alındı; hücre bazında ıslaklıkla sonuçlar aşağıda.
 
 Pencerenin %65'i yapı. Toprak killi tın; kent içindeki toprak çevreden tahmin edildi. Ortalama emiş kuruyken 21, doygunken 1,0 mm/sa.
 
@@ -42,6 +42,45 @@ Pencerenin %84'ü çayır/mera, %10'u çıplak/seyrek. Toprak tın. GLiM'e göre
 - Harita, karst platosunda "Karstik kireçtaşı"ndan çok daha az emiyor. Çayır/mera tınlı toprak sayılıyor (doygunken 3,4 mm/sa). Karst değeri (150 → 60) yalnızca çıplak/seyrek alanlara veriliyor.
 - Gerçekte karst platolarında yüzey akışı çok azdır. Bu yüzden harita burada büyük olasılıkla emişi az gösteriyor. Ne SoilGrids dokusu ne de 0,5°'lik GLiM ızgarası epikarstı (kayanın üst, çatlaklı kuşağını) görüyor.
 - Karst alanlarında asıl araç yine **Karst modu**. Harita seçiliyken karst modu açılırsa harita korunur, düdenler ayrıca su yutar.
+
+## Hücre bazında ıslaklık ve run-on
+
+İkinci sürümde ıslaklık her hücre için ayrı tutuluyor. Bir hücrenin ıslaklığı, o hücreye gelen suyla ilerliyor. Gelen su hem yağmur hem de üstteki hücrelerden akan su. Gelen su emişi karşılıyorsa ıslaklık tam hızla artıyor. Az geliyorsa gelen suyun emişe oranında artıyor; Horton'un "zaman sıkıştırma" yaklaşımı budur.
+
+Akan su, girdiği hücrede emilmeye devam ediyor (run-on); bu davranış önceden de vardı. Pencere dışındaki yukarı havzada ıslaklık ortak kalıyor.
+
+### Deneme: beton yamaç + orman vadi
+
+Kurulum:
+- Kağıthane penceresi düz bir eğimle değiştirildi (hücre ≈ 29 m, eğim %1,7).
+- Üst yarı beton: 6 → 1 mm/sa.
+- Alt yarı orman, tınlı toprak: 152 → 3,4 mm/sa.
+- 40 mm/sa · 1 sa, başta kuru. Kanalizasyon ve yukarı havza kapalı.
+
+| | Beton yamaç + orman vadi | Her yer beton |
+|---|---|---|
+| Alt yarıya düşen yağmur | 1,09 milyon m³ | 1,09 milyon m³ |
+| Alt yarıda zemine sızan | **1,72 milyon m³** | 0,09 milyon m³ |
+| Pencereden akıp giden (yaklaşık) | 0,34 milyon m³ | 1,96 milyon m³ |
+
+- **Orman kendi yağmurundan 0,63 milyon m³ fazla emdi.** Bu fark, betondan gelen suyun emildiği kısımdır.
+- **Orman kenarı uzak kısımdan önce doydu.** Betona bitişik ilk 8 sütunun emişi 1 saatin sonunda 24 mm/sa'e indi. Uzak kenarda emiş 45 mm/sa'te kaldı (ıslaklık x: 2,0'a karşı 1,3).
+
+### Kağıthane: tek zemin ve hücre bazında zemin
+
+Ayarlar yukarıdakiyle aynı: Orta boy, 40 mm/sa · 3 sa, standart şebeke, havzadan gelen su açık. Pencereye düşen yağmur 6,45 milyon m³.
+
+| Zemin | Önceki günler | Pencerede zemine sızan (milyon m³) | Yağmurun akışa geçen kısmı | >10 cm su (km²) | Dışarıdan gelen su (milyon m³) |
+|---|---|---|---|---|---|
+| Beton / asfalt | Doygun | 0,165 | %97 | 2,86 | 19,7 |
+| **Haritadan** | Doygun | 0,187 | %97 | 2,89 | 20,6 |
+| Beton / asfalt | Kuru | 0,228 | %96 | 2,86 | 17,6 |
+| **Haritadan** | Kuru | **0,697** | **%89** | 2,86 | 16,0 |
+
+"Akışa geçen kısım" (yağmur − sızan) / yağmur olarak hesaplandı. Sızan suya, dışarıdan ya da yamaçtan gelip emilen su da dahil.
+
+- **Kuru başlangıçta** haritalı zemin pencerede üç kat fazla su emiyor. Bu fark orman, park ve bahçelerden geliyor. Yine de su basan alan değişmiyor, çünkü taşkını belirleyen dereden gelen su (16–20 milyon m³). Pencerede emilen fark bunun yanında küçük (~0,5 milyon m³).
+- **Doygun başlangıçta** iki seçenek neredeyse aynı.
 
 ## Veriyle ilgili gözlemler
 

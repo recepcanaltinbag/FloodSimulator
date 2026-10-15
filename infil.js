@@ -18,6 +18,9 @@
 //     (~50 km) ızgarasında baskın kayaç türüdür; tek tek kayalıkları ayırt etmez.
 //   Su yüzeyi 0; sulak alan neredeyse doygun (f0 = fc). Verisi olmayan hücre "Karışık kentsel" (30 → 3) sayılır.
 //   Bozunma katsayısı k = 2 /sa (sitedeki diğer sınıflarla aynı; SWMM'nin önerdiği 2–7 /sa aralığının alt ucu).
+// Islaklık x hücre başınadır (INFM.wx, simStep içinde güncellenir): hücreye gelen su (yağış + üstten akan su) kapasiteyi
+//   karşılıyorsa x tam hızla (k), az geliyorsa gelen/kapasite oranında ilerler (Horton'un zaman sıkıştırma yaklaşımı).
+//   Başlangıç değeri "Önceki günler" (S.wetX). Pencere dışındaki yukarı havza kaba olduğundan orada x ortak kalır.
 // Toprağın derinliği, sıkışma, makro gözenekler, eğim ve donmuş zemin hesaba katılmaz.
 (function(){
   const LC=[null,
@@ -46,7 +49,11 @@
   }
 
   const M=window.INFM={ok:false,built:0,fc:null,dd:null,cls:null,reg:null,gen:0,mean:{f0:NODATA.f0,fc:NODATA.fc,k:K},cov:0,z12:0,
-                       up:null,upGeo:null,busy:false};
+                       up:null,upGeo:null,busy:false,wx:null,wxReg:null,acc:null,
+                       expL:Float32Array.from({length:2049},(_,k)=>Math.exp(-k/256))}; // e^−x tablosu, x = 0…8
+  const xAt=i=>M.wx&&M.wxReg===REG?M.wx[i]:S.wetX;           // hücrenin ıslaklığı (yoksa pencere ortak değeri)
+  const capAt=i=>M.fc[i]+M.dd[i]*Math.exp(-xAt(i));
+  function meanCap(){ let s=0,n=0; for(let i=0;i<N*N;i++){ if(sea[i]) continue; s+=capAt(i); n++; } return n?s/n:infCap(); }
   let IDX=null; const TC=new Map();
   const index=()=>IDX||(IDX=fetch("data/infil/index.json").then(r=>r.ok?r.json():{}).catch(()=>({})).then(j=>({
     10:new Set(j["10"]||[]),12:new Set(j["12"]||[])})));
@@ -88,10 +95,11 @@
     // yeni pencere öncekinden kaydırılmışsa diziler hemen kaydırılır (su gibi), sonra karolar gelince doldurulur
     if(M.reg&&M.fc&&M.reg.zd===reg.zd&&M.reg!==reg){
       const sx=(reg.x0-M.reg.x0)/2, sy=(reg.y0-M.reg.y0)/2, fc=new Float32Array(N*N), dd=new Float32Array(N*N), cl=new Uint8Array(N*N*4);
+      const wx=new Float32Array(N*N).fill(S.wetX), owx=M.wx&&M.wxReg===M.reg?M.wx:null;
       fc.fill(M.mean.fc); dd.fill(M.mean.f0-M.mean.fc);
       for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const ox=x+sx, oy=y+sy; if(ox<0||oy<0||ox>=N||oy>=N) continue;
-        const i=y*N+x, j=oy*N+ox; fc[i]=M.fc[j]; dd[i]=M.dd[j]; cl.set(M.cls.subarray(j*4,j*4+4),i*4); }
-      M.fc=fc; M.dd=dd; M.cls=cl; M.reg=reg;
+        const i=y*N+x, j=oy*N+ox; fc[i]=M.fc[j]; dd[i]=M.dd[j]; cl.set(M.cls.subarray(j*4,j*4+4),i*4); if(owx) wx[i]=owx[j]; }
+      M.fc=fc; M.dd=dd; M.cls=cl; M.reg=reg; M.wx=wx; M.wxReg=reg;
     }
     for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const i=y*N+x; X[i]=reg.x0+2*x+1; Y[i]=reg.y0+2*y+1; }
     M.busy=true; ui();
@@ -103,6 +111,7 @@
       const p=params(c[i*4],c[i*4+1],c[i*4+2]); fc[i]=p.fc; dd[i]=p.f0-p.fc;
       if(sea[i]) continue; nl++; s0+=p.f0; sc+=p.fc; bs+=c[i*4+1]/250; if(c[i*4+3]){ cov++; if(c[i*4+3]===12) z12++; }
     }
+    if(!M.wx||M.wxReg!==reg){ M.wx=new Float32Array(N*N).fill(S.wetX); M.wxReg=reg; }
     M.fc=fc; M.dd=dd; M.cls=c; M.reg=reg; M.cov=nl?cov/nl:0; M.built=nl?bs/nl:0; M.z12=nl?z12/nl:0; M.busy=false;
     M.mean={f0:nl?s0/nl:NODATA.f0, fc:nl?sc/nl:NODATA.fc, k:K}; M.ok=true;
     M.up=null; if(M.upGeo&&M.upGeo.reg===reg) upPrep2();
@@ -136,14 +145,14 @@
   window.infMean=()=>M.mean;
 
   function ui(){
-    if(S.soilV==="map"){ S.soil=M.mean; S.inf=infCap(); if(typeof soilUI==="function") soilUI(); }
+    if(S.soilV==="map"){ S.soil=M.mean; S.inf=M.ok&&M.reg===REG?meanCap():infCap(); if(typeof soilUI==="function") soilUI(); }
     $("lgInf").hidden=$("tex").value!=="inf";
   }
   window.infSoilText=()=>{
     if(M.busy&&!M.ok) return "Zemin haritası yükleniyor…";
     if(!M.ok) return "Bölge yüklenince arazi örtüsü ve toprak haritasından hücre hücre hesaplanır.";
     const p=M.mean, e=Math.exp(-S.wetX), cov=M.cov;
-    let t=`Hücre hücre: arazi örtüsü (ESA WorldCover) + toprak dokusu (SoilGrids). Pencere ortalaması şu an ${fmt(S.inf,1)} mm/sa; kuruyken ${fmt(p.f0)} mm/sa, ıslandıkça ${fmt(p.fc,1)} mm/sa'e iner (Horton).`;
+    let t=`Hücre hücre: arazi örtüsü (ESA WorldCover) + toprak dokusu (SoilGrids). Pencere ortalaması şu an ${fmt(S.inf,1)} mm/sa; kuruyken ${fmt(p.f0)} mm/sa, ıslandıkça ${fmt(p.fc,1)} mm/sa'e iner (Horton). Her hücre kendi aldığı suyla (yağış + yukarıdan akan su) ıslanır.`;
     t+= cov<0.05 ? " Bu alan için zemin haritası yok; her yer “Karışık kentsel” sayıldı." :
         ` Haritanın kapsadığı kara: %${fmt(cov*100)}`+(M.z12>0.5?" (~30 m)":" (~120 m, kaba)")+(cov<0.95?"; kalanı “Karışık kentsel” sayıldı.":".");
     if(M.up&&M.up.tot) t+=` Yukarı havzada şu anki ortalama emiş ${fmt(M.up.w.reduce((a,w,k)=>a+w*(M.up.fc[k]+(M.up.f0[k]-M.up.fc[k])*e),0),1)} mm/sa.`;
@@ -152,11 +161,11 @@
   };
   window.infTip=i=>{
     if(!M.ok||M.reg!==REG||!need()||sea[i]) return "";
-    const c=M.cls, r=c[i*4], g=c[i*4+1], bv=c[i*4+2], now=M.fc[i]+M.dd[i]*Math.exp(-S.wetX);
-    if(!c[i*4+3]) return `<br>Zemin: <b>veri yok</b> · “Karışık kentsel” sayıldı · emiş <b>${fmt(now,1)} mm/sa</b>`;
-    const p=params(r,g,bv), T=TEX[bv&15];
-    return `<br>Arazi: <b>${(LC[r]||{n:"?"}).n}</b>${g?` · yapı %${fmt(g/2.5)}`:""}<br>Toprak: <b>${T?T[0]:"bilinmiyor"}</b>${bv&32?" (çevreden tahmin)":""}${bv&16?" · karbonatlı kayaç bölgesi":""}`+
-      `<br>Emiş şimdi: <b>${fmt(now,now<10?1:0)} mm/sa</b> <span class="muted">(kuru ${fmt(p.f0)}, doygun ${fmt(p.fc,1)})</span>`+
+    const c=M.cls, r=c[i*4], g=c[i*4+1], bv=c[i*4+2], now=capAt(i), nt=`şu an <b>${fmt(now,now<10?1:0)} mm/sa</b> emiyor`;
+    if(!c[i*4+3]) return `<br>Zemin: <b>veri yok</b> (“Karışık kentsel” sayıldı) · ${nt}`;
+    const p=params(r,g,bv), T=TEX[bv&15], lc=r===5||g>=125?"yapı / yol":(LC[r]||{n:"?"}).n.toLowerCase();
+    return `<br>Zemin: <b>${lc}</b> · ${nt}<br><span class="muted">${g&&r!==5?`yapı %${fmt(g/2.5)} · `:""}toprak ${T?T[0]:"bilinmiyor"}${bv&32?" (çevreden tahmin)":""}${bv&16?" · karbonatlı kayaç bölgesi":""}`+
+      ` · kuru ${fmt(p.f0)}, doygun ${fmt(p.fc,1)} mm/sa · ıslaklık %${fmt(100*(1-Math.exp(-xAt(i))))}</span>`+
       (S.soilV!=="map"?`<br><span class="muted">Simülasyon şu an tek zemin kullanıyor; haritayı kullanmak için Zemin → Haritadan.</span>`:"");
   };
 
@@ -167,20 +176,20 @@
   let cnv=null, lastX=null;
   window.infCanvas=()=>{
     if(!M.ok||M.reg!==REG) return null;
-    const sm=document.createElement("canvas"); sm.width=sm.height=N; const g=sm.getContext("2d"), im=g.createImageData(N,N), e=Math.exp(-S.wetX);
+    const sm=document.createElement("canvas"); sm.width=sm.height=N; const g=sm.getContext("2d"), im=g.createImageData(N,N);
     for(let i=0;i<N*N;i++){ const o=i*4;
       if(sea[i]){ im.data[o]=20; im.data[o+1]=40; im.data[o+2]=70; im.data[o+3]=255; continue; }
-      const c=col(M.fc[i]+M.dd[i]*e); im.data[o]=c[0]; im.data[o+1]=c[1]; im.data[o+2]=c[2]; im.data[o+3]=255; }
+      const c=col(capAt(i)); im.data[o]=c[0]; im.data[o+1]=c[1]; im.data[o+2]=c[2]; im.data[o+3]=255; }
     g.putImageData(im,0,0);
     const W=satCanvas?Math.min(1024,satCanvas.width):512;
     cnv=document.createElement("canvas"); cnv.width=cnv.height=W; const h=cnv.getContext("2d");
     if(satCanvas){ h.drawImage(satCanvas,0,0,W,W); h.globalAlpha=.78; }
-    h.imageSmoothingEnabled=false; h.drawImage(sm,0,0,W,W); lastX=S.wetX;
+    h.imageSmoothingEnabled=false; h.drawImage(sm,0,0,W,W); lastX=S.simT;
     return cnv;
   };
   function refresh(force){
     ui();
-    if($("tex").value==="inf"&&M.ok&&(force||lastX===null||Math.abs(S.wetX-lastX)>0.05)) applyTexture();
+    if($("tex").value==="inf"&&M.ok&&(force||lastX===null||Math.abs(S.simT-lastX)>=60)) applyTexture();
   }
   setInterval(()=>{ if(S.loaded&&$("tex").value==="inf") refresh(false); },1500);
   const onSel=()=>{ if(need()&&S.loaded&&(!M.ok||M.reg!==REG)) prep(); if(M.ok&&!M.up&&M.upGeo) upPrep2(); ui(); };

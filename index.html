@@ -590,7 +590,7 @@ const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 const SOILS = {"0":{f0:0,fc:0,k:2}, "2":{f0:6,fc:1,k:4}, "8":{f0:30,fc:3,k:2}, "25":{f0:75,fc:10,k:2}, "80":{f0:150,fc:60,k:1}};
 const ANTE = {dry:0, wet:1, sat:3};   // başlangıç ıslaklığı (x): kuru, nemli (kapasite ~%37'ye inmiş), doygun (~%5)
 const infCap = () => S.soil.fc + (S.soil.f0 - S.soil.fc)*Math.exp(-S.wetX);
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, scen:"14 Ekim 2026", rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:3, wetX:3, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, infV:0, extIn:0, landN:1, scen:"14 Ekim 2026", rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:3, wetX:3, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -1779,7 +1779,8 @@ function resetWater(){
   d=new Float32Array(N*N); H=new Float32Array(N*N);
   fL=new Float32Array(N*N); fR=new Float32Array(N*N); fT=new Float32Array(N*N); fB=new Float32Array(N*N);
   for(let i=0;i<N*N;i++) if(sea[i]) d[i]=-b[i];
-  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.under=0; S.underP=0; S.running=false; S.wetX=S.ante; S.inf=infCap(); upReset(); updPlay(); updStats();
+  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.under=0; S.underP=0; S.infV=0; S.running=false; S.wetX=S.ante; S.inf=infCap(); upReset();
+  if(window.INFM&&INFM.wx) INFM.wx.fill(S.wetX); updPlay(); updStats();
   if(waterMesh){ updateWaterMesh(); drawDereOverlay(); }
 }
 function simStep(dt){
@@ -1811,8 +1812,12 @@ function simStep(dt){
   // zemin ıslandıkça sızma kapasitesi düşer (Horton); yukarı havza da bir sonraki dakikada bu değeri kullanır
   if(S.inf>0){ S.wetX += S.soil.k*dt/3600*Math.min(1,(raining?S.rate:0)/S.inf); S.inf=infCap(); }
   const inf = S.inf/1000/3600*dt;
-  // "Haritadan" zemin: hücre başına Horton eğrisi (fc + (f0−fc)·e^−x, mm/sa), ıslaklık x tüm pencerede ortak
-  const IM=S.soilV==="map"&&window.INFM&&INFM.ok?INFM:null, IFc=IM&&IM.fc, IDd=IM&&IM.dd, iEx=Math.exp(-S.wetX), iTo=dt/3.6e6;
+  // "Haritadan" zemin: hücre başına Horton eğrisi fc + (f0−fc)·e^−x (mm/sa) ve hücre başına ıslaklık x. x, hücreye o adımda
+  // gelen suyla (yağış + üstten akan su) ilerler: su kapasiteyi karşılıyorsa tam hızla (k), az geliyorsa gelen/kapasite oranında
+  // (zaman sıkıştırma yaklaşımı). Böylece yamaçtan su alan vadi tabanı tepeden önce doyar. e^−x tablodan okunur (x ≤ 8).
+  const IM=S.soilV==="map"&&window.INFM&&INFM.ok&&INFM.wx?INFM:null, IFc=IM&&IM.fc, IDd=IM&&IM.dd, IWx=IM&&IM.wx, IEL=IM&&IM.expL,
+        IA=IM&&IM.acc, iTo=dt/3.6e6, iK=IM?IM.mean.k*dt/3600:0;
+  let infT=0, iCap=0;
   const sw=S.sewer, toM=dt/1000/3600;
   const outStep=sw.out*toM, storeM=sw.store/1000;
   const allow=Math.min(sw.rate*(1-S.block/100)*toM, Math.max(0,storeM-S.stored)+outStep);
@@ -1830,8 +1835,10 @@ function simStep(dt){
       if(y>0) inflow+=fB[i-N];
       if(y<N-1) inflow+=fT[i+N];
       const out=fL[i]+fR[i]+fT[i]+fB[i];
-      const fi=IM?(IFc[i]+IDd[i]*iEx)*iTo:inf;
+      const fi=IM?(IFc[i]+IDd[i]*IEL[(IWx[i]*256)|0])*iTo:inf;
       let nd=d[i]+dt*(inflow-out)/l2+rain-fi;
+      if(fi>0){ const av=nd+fi; if(av>0){ const tk=av<fi?av:fi; infT+=tk; // run-on dahil hücredeki sudan sızan
+        if(IM){ const xw=IWx[i]+iK*tk/fi; IWx[i]=xw<8?xw:8; if(IA) IA[i]+=tk; } } if(IM) iCap+=fi; }
       if(K){
         if(nd>-fi) under+=nd<0?nd+fi:fi;
         if(K[i]&&nd>0){ const tk=nd<pq?nd:pq; nd-=tk; underP+=tk; }
@@ -1840,7 +1847,8 @@ function simStep(dt){
       d[i]=nd>0?nd:0;
     }
   }
-  S.stored+=taken/S.landN; S.drained+=taken*S.cell*S.cell;
+  S.stored+=taken/S.landN; S.drained+=taken*S.cell*S.cell; S.infV+=infT*l2;
+  if(IM&&iTo>0) S.inf=iCap/iTo/S.landN; // pencere ortalaması (gösterim ve küresel x için)
   if(K){ S.under+=(under+underP)*l2; S.underP+=underP*l2; }
   S.stored=Math.max(0,S.stored-outStep);
   if(UR){ // yukarı havzadan gelen su: giriş hücrelerine eşit paylaştır

@@ -52,7 +52,7 @@ Her şey tarayıcıda, JavaScript ve Three.js ile hesaplanır; sunucu tarafı yo
 
 ## Zemin emişi haritası
 
-Ayarlarda **Zemin → "Haritadan (arazi örtüsü + toprak)"** seçilince her hücre kendi Horton eğrisini kullanır: f = fc + (f0 − fc)·e^(−x). Islaklık x ("Önceki günler" ile başlar) pencere boyunca ortaktır, çünkü yağış her yere eşit düşer. Görünüm → **"Zemin emişi haritası"** anlık emişi renklendirir; fare ipucu hücrenin arazi örtüsünü, toprağını ve şu anki emişini yazar. Varsayılan seçim değişmedi (Beton / asfalt + Doygun).
+Ayarlarda **Zemin → "Haritadan (arazi örtüsü + toprak)"** seçilince her hücre kendi Horton eğrisini kullanır: f = fc + (f0 − fc)·e^(−x). Islaklık x "Önceki günler" ile başlar ve sonra her hücrede ayrı ilerler (aşağıya bakın). Görünüm → **"Zemin emişi haritası"** anlık emişi renklendirir; fare ipucu hücrenin arazi örtüsünü, toprağını ve şu anki emişini yazar. Varsayılan seçim değişmedi (Beton / asfalt + Doygun).
 
 Her hücre için üç bilgi birleştirilir:
 
@@ -68,12 +68,15 @@ Parametreler (mm/sa):
 - **f0 (kuruyken):** Akan (1993) değerleri; SWMM kılavuzunda da aktarılır. Bitki örtüsü az olan kuru zeminde kumlu 127, tınlı 76, killi 25; sık olanda 254, 152, 51. Ağaçlık sık sayılır; tarım, çıplak alan ve yosun az sayılır. Çalı ve çayıra ikisinin ortası verilir; bu ara değer bizim varsayımımızdır.
 - **Yapı payı:** WorldCover'ın 10 m'lik "yapı" pikselleri sitedeki "Beton / asfalt" (6 → 1) değerini alır. Hücrenin geri kalanı yukarıdaki toprak + örtü değerini alır.
 - **Özel durumlar:** Su yüzeyi emmez. Sulak alan neredeyse doygun sayılır (f0 = fc). GLiM'de karbonatlı olan bölgede çıplak / seyrek bitkili alan "Karstik kireçtaşı" (150 → 60) olur. Verisi olmayan hücre "Karışık kentsel" (30 → 3) sayılır. k = 2 /sa (sitedeki diğer sınıflarla aynı).
+- **Hücre bazında ıslaklık:** her hücrenin ıslaklığı, o hücreye gelen suyla ilerler. Gelen su yağmur ve üstten akan sudur (run-on). Su emişi karşılıyorsa ıslaklık tam hızla artar, az geliyorsa oranıyla artar. Böylece yamaçtan su alan vadi tabanı, yalnız yağmur alan tepeden önce doyar. Betondan akıp ormana giren su orada emilir.
 - **Yukarı havza:** pencereye akan dış hücreler aynı karolardan örneklenir; her parametre sınıfının yağış fazlası alanıyla ağırlıklandırılır. Bu seçenekte "dışarısı en az Karışık kentsel" kuralı uygulanmaz.
 
 **Hesaba katılmayanlar:** toprak derinliği, sıkışma, kök ve solucan kanalları (makro gözenekler), eğim, donmuş zemin ve kentte asfalt altındaki gerçek toprak. WorldCover'da "yapı" sınıfı küçük bahçeleri de içine alabilir. SoilGrids bir tahmin modelidir; kentte toprak tahmini özellikle belirsizdir. GLiM ızgarası tek tek kayalıkları ayırt etmez; karst için asıl araç yine **Karst modu**dur. Karst modu açıldığında bu seçenek korunur.
 
 **İlk deneme** ([rapor](docs/zemin-emisi-deneme.md)):
 - Kağıthane'de 40 mm/sa · 3 sa yağışta harita "Beton / asfalt"a yakın sonuç veriyor; su basan alan seçimden seçime %1–2'den fazla değişmiyor.
+- Başta kuru zeminde haritalı zemin pencerede üç kat fazla su emiyor (0,70'e karşı 0,23 milyon m³). Yağmurun akışa geçen kısmı %96'dan %89'a iniyor. Doygun zeminde fark yok.
+- Beton yamaç + orman vadi denemesinde orman, kendi yağmurundan 0,63 milyon m³ fazla emdi; betondan gelen su orada emiliyor.
 - Taşeli karst platosunda harita, karst modunun "Karstik kireçtaşı" varsayımından çok daha az emiyor. Çayır/mera tınlı toprak sayılıyor ve epikarst görülmüyor.
 - SoilGrids Türkiye'yi büyük ölçüde killi tın / tın / kil olarak tahmin ediyor; kumlu zeminler neredeyse yok. Kentlerde toprak tahmini yok, çevreden dolduruluyor.
 
@@ -97,7 +100,7 @@ Modeli 14 Ekim 2026 selinde su bastığı haberlere yansıyan 74 noktayla karş�
 
 - **Yükseklik verisi kaba:** 30 m çözünürlük, birkaç metre dikey hata; binalar, alt geçitler, duvarlar, bordürler ve menfezler yok. Su derinliği bu hatalardan daha küçük olduğu için en büyük belirsizlik kaynağıdır.
 - **Kanalizasyon tek bir kapasiteyle** temsil edilir; gerçek boru ağı ve geri tepme yoktur.
-- **Zemin emmesi** varsayılan olarak tek bir Horton eğrisiyle temsil edilir (pencere boyunca aynı zemin). "Haritadan" seçeneğinde her hücrenin kendi eğrisi vardır, ama ıslaklık yine pencere boyunca ortaktır ve parametreler sınıf ortalamalarıdır (bkz. [Zemin emişi haritası](#zemin-emişi-haritası)).
+- **Zemin emmesi** varsayılan olarak tek bir Horton eğrisiyle temsil edilir (pencere boyunca aynı zemin). "Haritadan" seçeneğinde her hücrenin kendi eğrisi ve ıslaklığı vardır, ama parametreler sınıf ortalamalarıdır ve pencere dışındaki yukarı havzada ıslaklık ortaktır (bkz. [Zemin emişi haritası](#zemin-emişi-haritası)).
 - **Yağış pencere boyunca her yere eşit** düşer; gerçek sağanaklar birkaç km'lik hücrelerle gelir.
 - Derinlikler belirli bir noktada iki kat fazla ya da az çıkabilir. Senaryoları **birbirleriyle karşılaştırmak** tek bir sonuca güvenmekten daha sağlıklıdır.
 
