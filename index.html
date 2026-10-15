@@ -537,100 +537,151 @@ addEventListener("keydown",e=>{ if(e.key==="Escape") setDrawer(false); });
 function updPlay(){ $("play").textContent=S.running?"⏸":"▶"; $("play").title=S.running?"Duraklat":"Devam et"; if(d) updStats(); }
 
 // ================= Veri yükleme =================
+// Karolar fetch + createImageBitmap ile ana iş parçacığı dışında çözülür ve LRU önbellekte tutulur:
+// geri dönünce ya da pencere kayınca ağ beklenmez. Etkin bölge isteklerinin önceliği çevre bloklarından yüksektir.
 function loadImg(url){
   return new Promise((res,rej)=>{const im=new Image();im.crossOrigin="anonymous";im.onload=()=>res(im);im.onerror=()=>rej(url);im.src=url;});
 }
-async function loadTiles(z,cx,cy,size,urlFn,onProg){
-  const x0=cx-size/2, y0=cy-size/2;
+function lruGet(m,k){ const v=m.get(k); if(v!==undefined){ m.delete(k); m.set(k,v); } return v; }
+function lruPut(m,k,v,cap){ m.set(k,v); while(m.size>cap) m.delete(m.keys().next().value); }
+const NET={n:0, max:8, hi:[], lo:[]};
+function netSlot(hi){ return new Promise(r=>{ if(NET.n<NET.max){ NET.n++; r(); } else (hi?NET.hi:NET.lo).push(r); }); }
+function netDone(){ const r=NET.hi.shift()||NET.lo.shift(); if(r) r(); else NET.n--; }
+const BMP=new Map(), BMP_CAP=MOBILE?160:420;
+function loadBitmap(url,hi){
+  let p=lruGet(BMP,url); if(p) return p;
+  p=(async()=>{
+    await netSlot(hi);
+    try{
+      if(window.createImageBitmap){ const r=await fetch(url,{mode:"cors"}); if(!r.ok) throw new Error(url); return await createImageBitmap(await r.blob()); }
+      return await loadImg(url);
+    } finally{ netDone(); }
+  })();
+  p.catch(()=>{ if(BMP.get(url)===p) BMP.delete(url); });
+  lruPut(BMP,url,p,BMP_CAP);
+  return p;
+}
+// yükseklik karosu → Float32Array(256×256) metre; çözülmüş hali önbellekte (ham görüntü atılır)
+const DEMC=new Map(); let decCv=null;
+function demTile(z,x,y,hi){
+  const key=z+"/"+x+"/"+y; let p=lruGet(DEMC,key); if(p) return p;
+  const url=DEM_URL(z,x,y);
+  p=loadBitmap(url,hi).then(bm=>{
+    if(!decCv) decCv=typeof OffscreenCanvas!=="undefined" ? new OffscreenCanvas(256,256) : Object.assign(document.createElement("canvas"),{width:256,height:256});
+    const g=decCv.getContext("2d",{willReadFrequently:true}); g.clearRect(0,0,256,256); g.drawImage(bm,0,0);
+    const px=g.getImageData(0,0,256,256).data, h=new Float32Array(65536);
+    for(let i=0,k=0;i<65536;i++,k+=4) h[i]=px[k]*256+px[k+1]+px[k+2]/256-32768;
+    BMP.delete(url);
+    return h;
+  });
+  p.catch(()=>{ if(DEMC.get(key)===p) DEMC.delete(key); });
+  lruPut(DEMC,key,p,MOBILE?120:320);
+  return p;
+}
+// tam sayı piksel dikdörtgeni (z düzeyinde) için yükseklik dizisi
+async function demRegion(z,x0,y0,w,h,hi,onProg){
+  const tx0=Math.floor(x0/256), ty0=Math.floor(y0/256), tx1=Math.floor((x0+w-1)/256), ty1=Math.floor((y0+h-1)/256);
+  const out=new Float32Array(w*h), total=(tx1-tx0+1)*(ty1-ty0+1), jobs=[]; let done=0;
+  for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++) jobs.push(demTile(z,tx,ty,hi).then(t=>{
+    const ax=Math.max(x0,tx*256), bx=Math.min(x0+w,tx*256+256), ay=Math.max(y0,ty*256), by=Math.min(y0+h,ty*256+256);
+    for(let yy=ay;yy<by;yy++){ const s=(yy-ty*256)*256+(ax-tx*256); out.set(t.subarray(s,s+bx-ax),(yy-y0)*w+(ax-x0)); }
+    onProg&&onProg(++done/total);
+  }));
+  await Promise.all(jobs);
+  return out;
+}
+const ENH="contrast(1.08) saturate(1.18) brightness(1.04)";
+// görüntü karolarını tek tuvale diz (x0,y0: sol üst piksel, z düzeyinde)
+async function compose(z,x0,y0,size,urlFn,hi,onProg,filter){
   const tx0=Math.floor(x0/256), ty0=Math.floor(y0/256), tx1=Math.floor((x0+size-1)/256), ty1=Math.floor((y0+size-1)/256);
   const cnv=document.createElement("canvas"); cnv.width=cnv.height=size;
-  const g=cnv.getContext("2d");
-  // yükseklik karoları RGB ile kodlanır: yumuşatma dikişlerde sahte duvar/hendek üretir
-  if(urlFn===DEM_URL) g.imageSmoothingEnabled=false;
-  const total=(tx1-tx0+1)*(ty1-ty0+1); let done=0;
-  const jobs=[];
+  const g=cnv.getContext("2d"); if(filter) g.filter=filter;
+  const total=(tx1-tx0+1)*(ty1-ty0+1), jobs=[]; let done=0;
   for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++)
-    jobs.push(loadImg(urlFn(z,tx,ty)).then(im=>{ g.drawImage(im,tx*256-x0,ty*256-y0); onProg&&onProg(++done/total); }));
+    jobs.push(loadBitmap(urlFn(z,tx,ty),hi).then(im=>{ g.drawImage(im,tx*256-x0,ty*256-y0); onProg&&onProg(++done/total); }));
   await Promise.all(jobs);
   return cnv;
 }
+function loadTiles(z,cx,cy,size,urlFn,onProg){ return compose(z,cx-size/2,cy-size/2,size,urlFn,true,onProg); }
+const idle=()=>new Promise(r=>window.requestIdleCallback ? requestIdleCallback(()=>r(),{timeout:80}) : setTimeout(r,16));
 function ov(text,frac){ $("overlay").style.display="flex"; $("ovText").textContent=text; $("ovBar").style.width=((frac||0)*100)+"%"; }
 
-// shift: {sx,sy} hücre — etkin pencereyi kaydırır, suyu taşır, kamerayı yerinde tutar
-let shiftBusy=false;
+// shift: {sx,sy} hücre — yeni blok arka planda hazırlanır (simülasyon ve çizim sürer), hazır olunca tek karede
+// değiştirilir: su taşınır, kamera görsel olarak yerinde kalır.
+let shiftBusy=false, LOADGEN=0;
 async function loadRegion(shift){
-  const wasRunning=S.running;
-  S.running=false; updPlay();
-  $("play").disabled=$("reset").disabled=true;
+  const gen=shift ? LOADGEN : ++LOADGEN;
+  if(!shift){ S.running=false; updPlay(); $("play").disabled=$("reset").disabled=true; }
   const zd=SIZES[S.size].z, n=2**zd;
   let cx, cy;
-  if(shift){ cx=REG.cx+2*shift.sx; cy=REG.cy+2*shift.sy; const ll=px2ll(cx,cy,n); S.lat=ll.lat; S.lon=ll.lon; }
+  if(shift){ cx=REG.cx+2*shift.sx; cy=REG.cy+2*shift.sy; }
   else { cx=Math.round(lon2px(S.lon,n)); cy=Math.round(lat2py(S.lat,n)); } // tam piksel: karolar kaymasın
   const prog=shift ? (t,f)=>shiftProg(f) : ov;
+  const ll=px2ll(cx,cy,n), lat=ll.lat;
   try{
     const lt=`${S.name.replace(/ Deresi$/,"")} yükleniyor · yükseklik verisi…`;
     prog(lt,0);
-    const demC=await loadTiles(zd,cx,cy,512,DEM_URL,f=>prog(lt,f*0.2));
+    const dem=await demRegion(zd,cx-256,cy-256,512,512,true,f=>prog(lt,f*0.2));
     const q=Math.min(S.q, MOBILE?2:3, Math.log2(maxTex/512)); // telefonda bellek için en fazla 2048 px
     const zs=zd+q, sz=512*2**q, k=2**q;
     let sat=null;
-    try{
-      const raw=await loadTiles(zs,cx*k,cy*k,sz,SAT_URL,f=>prog(`Uydu görüntüsü indiriliyor… (${sz}×${sz})`,0.2+f*0.75));
-      sat=enhance(raw);
-    }catch(e){}
-    // ---- indirmeler bitti: buradan sonrası eşzamanlı (simülasyon döngüsü eski dizileri karışık görmesin) ----
-    const old=shift ? {d, sea, reg:REG} : null;
-    if(shift){ S.name=nearestSuburb(S.lat,S.lon)||"Seçili alan"; }
+    try{ sat=await compose(zs,cx*k-sz/2,cy*k-sz/2,sz,SAT_URL,true,f=>prog(`Uydu görüntüsü indiriliyor… (${sz}×${sz})`,0.2+f*0.75),ENH); }catch(e){}
+    if(gen!==LOADGEN){ if(shift) shiftBusy=false; return; } // bu sırada başka bölge seçildi
+    // ---- hesaplar küçük parçalar halinde, boşta kalan zamanda (çizim döngüsü takılmasın) ----
+    const nb=new Float32Array(N*N);
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+      const k0=y*2*512+x*2; nb[y*N+x]=(dem[k0]+dem[k0+1]+dem[k0+512]+dem[k0+513])/4;
+    }
+    const nsea=new Uint8Array(N*N); for(let i=0;i<N*N;i++) nsea[i]=nb[i]<=0.3?1:0;
+    if(shift) await idle();
+    fillVoids(nb,nsea);
+    if(shift) await idle();
+    const sb=shift ? await smoothDEMAsync(nb) : smoothDEM(nb), cell=156543.03*Math.cos(lat*Math.PI/180)/n*2;
+    if(shift) await idle();
+    let pre=null, smk=null;
+    let preTex=null;
+    if(shift){ await idle(); smk=seaMaskRGBA(nsea,N,1); await idle(); pre=terrainArrays(sb,nsea,SIZE/(N*cell)*S.ex); await idle();
+      if(sat&&$("tex").value==="sat"){ preTex=makeTerrainTex(sat); renderer.initTexture(preTex); await idle(); } } // GPU'ya yükleme de önceden
+    if(gen!==LOADGEN){ if(shift) shiftBusy=false; return; }
+    // ---- değiştirme (tek kare) ----
+    const old=shift ? {d, sea} : null;
+    S.lat=ll.lat; S.lon=ll.lon;
+    if(shift) S.name=nearestSuburb(S.lat,S.lon)||"Seçili alan";
     else clearBuildings();
-    REG={zd,n,x0:cx-256,y0:cy-256};
+    REG={zd,n,x0:cx-256,y0:cy-256,zs,sz,k,cx,cy};
     $("regName").textContent=S.name;
     $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
-    const px=demC.getContext("2d").getImageData(0,0,512,512).data;
-    b=new Float32Array(N*N);
-    for(let y=0;y<N;y++)for(let x=0;x<N;x++){
-      let s=0;
-      for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
-        const k=((y*2+dy)*512+(x*2+dx))*4;
-        s+=px[k]*256+px[k+1]+px[k+2]/256-32768;
-      }
-      b[y*N+x]=s/4;
-    }
-    sea=new Uint8Array(N*N); for(let i=0;i<N*N;i++) sea[i]=b[i]<=0.3?1:0;
-    fillVoids();
-    b=smoothDEM(b);
-    S.cell=156543.03*Math.cos(S.lat*Math.PI/180)/n*2;
+    b=sb; sea=nsea; S.cell=cell;
     S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
-    elevCanvas=makeElevCanvas();
-
-    roadCanvas=null; blendCanvas=null;
+    elevCanvas=null; roadCanvas=null; blendCanvas=null; // yükseklik renkleri gerektiğinde üretilir
     satCanvas=sat; if(!sat) $("tex").value="elev";
-    REG.zs=zs; REG.sz=sz; REG.k=k; REG.cx=cx; REG.cy=cy;
 
-    if(!shift) ov("Sahne hazırlanıyor…",1);
     if(shift){
-      // su taşıma: yeni (x,y) hücresi = eski (x+sx, y+sy); akılar sıfırlanır, istatistikler sürer
-      const sim={simT:S.simT,rainMM:S.rainMM,stored:S.stored,drained:S.drained};
-      resetWater(); Object.assign(S,sim);
+      // su taşıma: yeni (x,y) hücresi = eski (x+sx, y+sy); akılar sıfırlanır, istatistikler ve yağış sürer
+      d=new Float32Array(N*N); H=new Float32Array(N*N);
+      fL=new Float32Array(N*N); fR=new Float32Array(N*N); fT=new Float32Array(N*N); fB=new Float32Array(N*N);
       for(let y=0;y<N;y++)for(let x=0;x<N;x++){
-        const i=y*N+x; if(sea[i]) continue;
+        const i=y*N+x; if(sea[i]){ d[i]=-b[i]; continue; }
         const ox=x+shift.sx, oy=y+shift.sy; if(ox<0||oy<0||ox>=N||oy>=N) continue;
         const j=oy*N+ox; if(!old.sea[j]) d[i]=old.d[j];
       }
       const dx=shift.sx*SIZE/(N-1), dz=shift.sy*SIZE/(N-1);
-      fly=null; controls.target.x-=dx; controls.target.z-=dz; camera.position.x-=dx; camera.position.z-=dz;
+      if(fly){ for(const v of [fly.fromT,fly.toT,fly.fromP,fly.toP]){ v.x-=dx; v.z-=dz; } }
+      controls.target.x-=dx; controls.target.z-=dz; camera.position.x-=dx; camera.position.z-=dz;
       fx.fill(-1); clearBuildings(); bldLastT=null;
-      buildScene(true);
-    } else { resetWater(); buildScene(); }
-    ringReset();
+      seaMesh.visible=sea.some(v=>v); updateSeaMask(smk);
+      rebuildTerrainZ(pre,true); if(preTex) setTerrainTex(preTex); else applyTexture(); drawDereOverlay(); updStats();
+      ringShifted(); shiftDone();
+    } else { resetWater(); buildScene(); ringReset(); }
     S.loaded=true; $("overlay").style.display="none";
     $("play").disabled=$("reset").disabled=false;
-    S.running=shift?wasRunning:true; updPlay(); // başlat butonu yok: yeni bölge yüklenince yağmur kendiliğinden başlar
+    if(!shift){ S.running=true; updPlay(); } // başlat butonu yok: yeni bölge yüklenince yağmur kendiliğinden başlar
     pickSet(S.lat,S.lon,S.name);
-    loadLabels(true); // gömülü etiketler hemen; OSM etiketleri dere verisinden sonra
-    loadDere().then(()=>loadLabels());
+    const lbl=()=>{ loadLabels(true); loadDere().then(()=>loadLabels()); }; // gömülü etiketler hemen; OSM etiketleri dere verisinden sonra
+    if(shift) idle().then(lbl); else lbl();
   }catch(e){
     console.error(e);
-    if(shift){ shiftProg(-1); S.running=wasRunning; $("play").disabled=$("reset").disabled=false; updPlay(); }
+    if(shift) shiftProg(-1);
     else ov("Veri indirilemedi (internet bağlantısını kontrol et).",0);
   }
 }
@@ -640,7 +691,7 @@ function nearestSuburb(lat,lon){
   return best && bd<4000 ? best : null;
 }
 // Kenara değmeyen küçük "deniz" adacıkları DEM boşluğudur: karaya çevir, komşulardan doldur
-function fillVoids(){
+function fillVoids(b,sea){
   const comp=new Int32Array(N*N).fill(-1), stack=[], fill=[];
   for(let s0=0;s0<N*N;s0++){
     if(!sea[s0]||comp[s0]>=0) continue;
@@ -668,10 +719,16 @@ function fillVoids(){
     left=next;
   }
 }
-function smoothDEM(a){
+async function smoothDEMAsync(a){ // aynı filtre, 64 satırlık parçalar arasında boşta kalan zamana bırakır
+  const o=new Float32Array(N*N);
+  for(let y0=0;y0<N;y0+=64){ smoothRows(a,o,y0,Math.min(N,y0+64)); await idle(); }
+  return o;
+}
+function smoothDEM(a){ const o=new Float32Array(N*N); smoothRows(a,o,0,N); return o; }
+function smoothRows(a,o,ya,yb){
   // 3x3 [1 2 1] filtre: SRTM gürültüsünü ve sahte çukur/sivri noktaları azaltır
-  const o=new Float32Array(N*N), w=[1,2,1];
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+  const w=[1,2,1];
+  for(let y=ya;y<yb;y++)for(let x=0;x<N;x++){
     let s=0,ws=0;
     for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){
       const xx=x+i, yy=y+j; if(xx<0||yy<0||xx>=N||yy>=N) continue;
@@ -680,14 +737,8 @@ function smoothDEM(a){
     }
     o[y*N+x]=s/ws;
   }
-  return o;
 }
-function enhance(src){
-  const c=document.createElement("canvas"); c.width=src.width; c.height=src.height;
-  const g=c.getContext("2d"); g.filter="contrast(1.08) saturate(1.18) brightness(1.04)"; g.drawImage(src,0,0);
-  return c;
-}
-function makeElevCanvas(){
+function makeElevCanvas(b,sea,cell){
   const c=document.createElement("canvas"); c.width=c.height=N; const g=c.getContext("2d"); const im=g.createImageData(N,N);
   let mx=1; for(let i=0;i<N*N;i++) if(!sea[i]) mx=Math.max(mx,b[i]);
   const stops=[[0,[60,120,70]],[0.25,[140,170,90]],[0.5,[200,180,120]],[0.75,[160,120,90]],[1,[240,240,240]]];
@@ -698,7 +749,7 @@ function makeElevCanvas(){
     for(let s=1;s<stops.length;s++){ if(t<=stops[s][0]){c0=stops[s-1];c1=stops[s];break;} }
     const f=(t-c0[0])/(c1[0]-c0[0]||1);
     const xl=b[y*N+Math.max(0,x-1)], xr=b[y*N+Math.min(N-1,x+1)], yu=b[Math.max(0,y-1)*N+x], yd=b[Math.min(N-1,y+1)*N+x];
-    const sh=Math.max(0.45,Math.min(1.25,1+((xl-xr)+(yu-yd))*0.6/S.cell));
+    const sh=Math.max(0.45,Math.min(1.25,1+((xl-xr)+(yu-yd))*0.6/cell));
     for(let j=0;j<3;j++) im.data[k+j]=Math.min(255,(c0[1][j]+(c1[1][j]-c0[1][j])*f)*sh);
     im.data[k+3]=255;
   }
@@ -1054,27 +1105,32 @@ scene.add(new THREE.HemisphereLight(0xffffff,0x445566,0.75));
 const sun=new THREE.DirectionalLight(0xffffff,0.55); sun.position.set(-100,200,80); scene.add(sun);
 
 const SIZE=200;
-let terrainMesh, waterMesh, waterTex, waterData, terrainTex, dereMesh, dereTex, dereCanvas;
+let skirtMesh=null, terrainMesh, waterMesh, waterTex, waterData, terrainTex, dereMesh, dereTex, dereCanvas;
 function sc(){ return SIZE/(N*S.cell); }
 
 // ================= Deniz (stilize su gölgelendiricisi) =================
 // R: deniz maskesi (kıyıda yumuşak), G: kıyıya uzaklık (0 kıyı → 1 açık deniz)
 const seaMaskData=new Uint8Array(N*N*4), seaMask=new THREE.DataTexture(seaMaskData,N,N,THREE.RGBAFormat);
 seaMask.magFilter=seaMask.minFilter=THREE.LinearFilter;
-function updateSeaMask(){
-  const dist=new Float32Array(N*N).fill(1e9), q=[];
-  for(let i=0;i<N*N;i++){ if(!sea[i]) continue; const x=i%N;
-    for(const j of [i-1,i+1,i-N,i+N]){ if(j<0||j>=N*N||Math.abs((j%N)-x)>1) continue; if(!sea[j]){ dist[i]=0; q.push(i); break; } } }
-  for(let h=0;h<q.length;h++){ const i=q[h], x=i%N;
-    for(const j of [i-1,i+1,i-N,i+N]){ if(j<0||j>=N*N||Math.abs((j%N)-x)>1||!sea[j]) continue; if(dist[j]>dist[i]+1){ dist[j]=dist[i]+1; q.push(j); } } }
-  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
-    const i=y*N+x, o=((N-1-y)*N+x)*4;
-    let m=sea[i]?255:0;
-    if(!sea[i]){ let c=0; for(const j of [i-1,i+1,i-N,i+N]) if(j>=0&&j<N*N&&sea[j]) c++; m=c?Math.min(200,70*c):0; }
-    seaMaskData[o]=m; seaMaskData[o+1]=sea[i]?Math.min(255,dist[i]/22*255):0; seaMaskData[o+2]=0; seaMaskData[o+3]=255;
+// sm: deniz (1/0) M×M; cr: hücre boyu / etkin hücre. Çıktı: satırları ters RGBA (R maske, G kıyıya uzaklık)
+function seaMaskRGBA(sm,M,cr){
+  const dist=new Float32Array(M*M).fill(1e9), q=new Int32Array(M*M), out=new Uint8Array(M*M*4); let qh=0, qt=0;
+  for(let y=0;y<M;y++) for(let x=0;x<M;x++){ const k=y*M+x; if(!sm[k]) continue;
+    if((x>0&&!sm[k-1])||(x<M-1&&!sm[k+1])||(y>0&&!sm[k-M])||(y<M-1&&!sm[k+M])){ dist[k]=0; q[qt++]=k; } }
+  while(qh<qt){ const k=q[qh++], x=k%M, nd=dist[k]+1;
+    if(x>0&&sm[k-1]&&dist[k-1]>nd){ dist[k-1]=nd; q[qt++]=k-1; }
+    if(x<M-1&&sm[k+1]&&dist[k+1]>nd){ dist[k+1]=nd; q[qt++]=k+1; }
+    if(k>=M&&sm[k-M]&&dist[k-M]>nd){ dist[k-M]=nd; q[qt++]=k-M; }
+    if(k<M*M-M&&sm[k+M]&&dist[k+M]>nd){ dist[k+M]=nd; q[qt++]=k+M; } }
+  for(let y=0;y<M;y++) for(let x=0;x<M;x++){
+    const k=y*M+x, o=((M-1-y)*M+x)*4;
+    let m=255;
+    if(!sm[k]){ const c=(x>0&&sm[k-1])+(x<M-1&&sm[k+1])+(y>0&&sm[k-M])+(y<M-1&&sm[k+M]); m=c?Math.min(200,70*c):0; }
+    out[o]=m; out[o+1]=sm[k]?Math.min(255,dist[k]*cr/22*255):0; out[o+3]=255;
   }
-  seaMask.needsUpdate=true;
+  return out;
 }
+function updateSeaMask(data){ seaMaskData.set(data||seaMaskRGBA(sea,N,1)); seaMask.needsUpdate=true; }
 const seaMat=new THREE.ShaderMaterial({
   transparent:true, depthWrite:false,
   uniforms:{uTime:{value:0}, uMask:{value:seaMask}},
@@ -1110,112 +1166,185 @@ const seaMesh=new THREE.Mesh(seaGeo,seaMat); seaMesh.rotation.x=-Math.PI/2; seaM
 function updateSea(t){ if(seaMesh.visible) seaMat.uniforms.uTime.value=t; }
 
 // ================= Çevre halkası (yalnız görünüm) =================
-// Etkin bölgenin çevresindeki bölge büyüklüğündeki bloklar düşük çözünürlükte yüklenir; simülasyon yok.
-// Blok (i,j) zd pikselinde [c-256, c+256] aralığını kaplar (c = merkez + 512·i). Etkin bölgeye bakan kenar
-// köşeleri etkin ızgaranın son hücresine (±255) yapıştırılır ve yükseklik oradan alınır: dikiş açılmaz.
-const RING={on:true, R:MOBILE?1:2, M:64, tex:MOBILE?512:1024, tiles:new Map(), gen:0, busy:0};
+// Bloklar zd pikselinde mutlak 512'lik ızgaraya oturur (I,J): pencere kayınca yeniden yüklenmez, yalnız taşınır.
+// Etkin bölgenin altında kalan kısım gölgelendiricide atılır (delik); etkin kenara yakın köşeler etkin araziye
+// bağlanır, kalan küçük farkı etek (skirt) örter. İki ayrıntı düzeyi: L0 (kaba, geniş halka) hemen, L1 (ayrıntılı,
+// kameranın gideceği yer) sonra; geçiş kısa bir saydamlık geçişiyle. Önbellek LRU: geri dönünce anında görünür.
 const RW=SIZE/510; // dünya birimi / zd pikseli
-function ringMeshes(){ const a=[]; RING.tiles.forEach(t=>{ if(t.mesh) a.push(t.mesh); }); return a; }
-function ringDispose(t){
-  if(t.mesh){ scene.remove(t.mesh); t.mesh.geometry.dispose(); if(t.mesh.material.map) t.mesh.material.map.dispose(); t.mesh.material.dispose(); }
-  if(t.sea){ scene.remove(t.sea); t.sea.geometry.dispose(); t.sea.material.uniforms.uMask.value.dispose(); t.sea.material.dispose(); }
+const RING={on:true, R:MOBILE?1:2, cap:MOBILE?20:64, hiCap:MOBILE?5:14, hiR:MOBILE?0.8:1.2, maxBusy:MOBILE?2:3,
+  L:[{M:MOBILE?48:64, tex:512, dz:-2, mr:128}, {M:MOBILE?96:128, tex:1024, dz:-1, mr:256}],
+  tiles:new Map(), gen:0, busy:0, reblend:[], v:new THREE.Vector2(), last:null, acc:0, fades:[], pred:new THREE.Vector3()};
+const HOLE={value:SIZE/2}, SEAHOLE={value:SIZE*256/510};
+function holeOBC(sh){
+  sh.uniforms.uHole=HOLE;
+  sh.vertexShader="varying vec2 vHoleXZ;\n"+sh.vertexShader.replace("#include <project_vertex>","#include <project_vertex>\n  vHoleXZ=(modelMatrix*vec4(transformed,1.0)).xz;");
+  sh.fragmentShader="uniform float uHole;\nvarying vec2 vHoleXZ;\n"+sh.fragmentShader.replace("void main() {","void main() {\n  if(abs(vHoleXZ.x)<uHole&&abs(vHoleXZ.y)<uHole) discard;");
 }
-function ringReset(){ RING.gen++; RING.tiles.forEach(ringDispose); RING.tiles.clear(); RING.busy=0; }
+const ringSeaFrag=seaMat.fragmentShader.replace("void main(){","uniform float uHole;\n    void main(){ if(abs(vW.x)<uHole&&abs(vW.z)<uHole) discard;");
+function ringMeshes(){ const a=[]; RING.tiles.forEach(e=>e.lay.forEach(l=>{ if(l&&l.mesh.visible) a.push(l.mesh); })); return a; }
+function layDispose(l){
+  scene.remove(l.mesh); l.mesh.geometry.dispose(); l.skirt.geometry.dispose(); if(l.mesh.material.map) l.mesh.material.map.dispose(); l.mesh.material.dispose();
+  if(l.sea){ scene.remove(l.sea); l.sea.geometry.dispose(); l.sea.material.uniforms.uMask.value.dispose(); l.sea.material.dispose(); }
+}
+function entDispose(e){ e.dead=true; e.lay.forEach(l=>l&&layDispose(l)); e.lay=[null,null]; }
+function ringReset(){ RING.gen++; RING.tiles.forEach(entDispose); RING.tiles.clear(); RING.busy=0; RING.fades=[]; RING.reblend=[]; }
 function activeH(px,py){ // etkin arazinin gösterilen yüksekliği (m), zd pikselinde, çift doğrusal
   const gx=Math.max(0,Math.min(N-1,(px-REG.cx+255)/2)), gy=Math.max(0,Math.min(N-1,(py-REG.cy+255)/2));
   const x0=Math.min(N-2,Math.floor(gx)), y0=Math.min(N-2,Math.floor(gy)), fx_=gx-x0, fy_=gy-y0;
   const v=i=>sea[i]?Math.max(b[i],-3):b[i], i=y0*N+x0;
   return (v(i)*(1-fx_)+v(i+1)*fx_)*(1-fy_)+(v(i+N)*(1-fx_)+v(i+N+1)*fx_)*fy_;
 }
-function ringTick(){
-  if(!S.loaded||!REG) return;
-  const t=controls.target, R=RING.R, BW=512*RW;
-  if(!RING.on){ if(RING.tiles.size) ringReset(); return; }
-  const want=[];
-  for(let j=-R;j<=R;j++) for(let i=-R;i<=R;i++){
-    if(!i&&!j) continue;
-    const key=i+","+j, dd=Math.hypot(i*BW-t.x,j*BW-t.z), tl=RING.tiles.get(key);
-    if(tl && dd>2.4*SIZE){ ringDispose(tl); RING.tiles.delete(key); }
-    else if(!tl && dd<1.55*SIZE) want.push({i,j,key,dd});
+// etkin kareye uzaklık (zd pikseli; içerisi ≤0)
+function holeDist(X,Y){ return Math.max(Math.abs(X-REG.cx),Math.abs(Y-REG.cy))-255; }
+function layNear(e,l){ const X0=512*e.I, Y0=512*e.J; return holeDist(Math.max(X0,Math.min(X0+512,REG.cx)),Math.max(Y0,Math.min(Y0+512,REG.cy))) < 3*512/(l.M-1); }
+function layBlend(e,l){
+  const M=l.M, st=512/(M-1), band=3*st, X0=512*e.I, Y0=512*e.J;
+  l.near=layNear(e,l);
+  if(!l.near){ l.hm.set(l.h0); return; }
+  for(let r=0;r<M;r++) for(let q=0;q<M;q++){
+    const v=r*M+q, X=X0+q*st, Y=Y0+r*st, dE=holeDist(X,Y);
+    if(dE>=band) l.hm[v]=l.h0[v];
+    else if(dE<=0) l.hm[v]=activeH(X,Y);
+    else { const w=dE/band, a=activeH(Math.max(REG.cx-255,Math.min(REG.cx+255,X)),Math.max(REG.cy-255,Math.min(REG.cy+255,Y))); l.hm[v]=a*(1-w)+l.h0[v]*w; }
   }
-  want.sort((a,c)=>a.dd-c.dd);
-  for(const w of want){ if(RING.busy>=2) break; ringLoad(w); }
 }
-async function ringLoad({i,j,key}){
-  const gen=RING.gen, reg=REG, tl={i,j}; RING.tiles.set(key,tl); RING.busy++;
+function layPlace(e,l){
+  l.mesh.position.set((512*e.I-REG.cx)*RW,0,(512*e.J-REG.cy)*RW);
+  if(l.sea) l.sea.position.set((512*e.I+256-REG.cx)*RW,0.02,(512*e.J+256-REG.cy)*RW);
+}
+function layScale(l){
+  const M=l.M, k=sc()*S.ex, p=l.mesh.geometry.attributes.position.array, sp=l.skirt.geometry.attributes.position.array;
+  for(let v=0;v<M*M;v++) p[v*3+1]=l.hm[v]*k;
+  for(let s=0;s<l.per.length;s++){ const y=l.hm[l.per[s]]*k; sp[s*6+1]=y; sp[s*6+4]=y-3; }
+  l.mesh.geometry.attributes.position.needsUpdate=true; l.skirt.geometry.attributes.position.needsUpdate=true;
+  l.mesh.geometry.computeVertexNormals(); l.mesh.geometry.computeBoundingSphere(); l.skirt.geometry.computeBoundingSphere();
+}
+function ringRescale(){ RING.tiles.forEach(e=>e.lay.forEach(l=>l&&layScale(l))); }
+function ringShifted(){ // etkin pencere kaydı: bloklar hemen taşınır; etkin kenara bağlanan yükseklikler sonraki karelerde
+  RING.last=null;
+  RING.tiles.forEach(e=>e.lay.forEach(l=>{ if(!l) return; layPlace(e,l); if(l.near||layNear(e,l)) RING.reblend.push([e,l]); }));
+}
+function ringTick(rdt){
+  if(!S.loaded||!REG) return;
+  const t=controls.target;
+  if(RING.last && rdt>0){ const a=Math.min(1,rdt*4); RING.v.x+=((t.x-RING.last.x)/rdt-RING.v.x)*a; RING.v.y+=((t.z-RING.last.z)/rdt-RING.v.y)*a; }
+  RING.last=(RING.last||new THREE.Vector3()).copy(t);
+  // tahmini hedef: ~1,5 sn sonrası (en fazla 1,2 blok ileri)
+  const pv=RING.v.clone().multiplyScalar(1.5); if(pv.length()>SIZE*1.2) pv.setLength(SIZE*1.2);
+  RING.pred.set(t.x+pv.x,0,t.z+pv.y);
+  RING.acc+=rdt; if(RING.acc<0.2) return; RING.acc=0;
+  const now=performance.now();
+  if(!RING.on){ RING.tiles.forEach(e=>e.lay.forEach(l=>{ if(l){ l.mesh.visible=false; if(l.sea) l.sea.visible=false; } })); return; }
+  const pr=RING.pred, tI=Math.floor((REG.cx+t.x/RW)/512), tJ=Math.floor((REG.cy+t.z/RW)/512),
+        pI=Math.floor((REG.cx+pr.x/RW)/512), pJ=Math.floor((REG.cy+pr.z/RW)/512), R=RING.R, want=new Map();
+  const cdist=(I,J,p)=>Math.hypot((512*I+256-REG.cx)*RW-p.x,(512*J+256-REG.cy)*RW-p.z);
+  const add=(I,J)=>{ const key=REG.zd+":"+I+","+J; if(!want.has(key)) want.set(key,{I,J,key}); };
+  for(let j=-R;j<=R;j++) for(let i=-R;i<=R;i++) add(tI+i,tJ+j);
+  for(let j=-1;j<=1;j++) for(let i=-1;i<=1;i++) if(!MOBILE||(!i&&!j)) add(pI+i,pJ+j);
+  const jobs=[];
+  want.forEach(w=>{
+    let e=lruGet(RING.tiles,w.key);
+    if(!e){ e={I:w.I,J:w.J,key:w.key,lay:[null,null],loading:[false,false],fail:[0,0],hiAt:0}; RING.tiles.set(w.key,e); }
+    e.dp=cdist(e.I,e.J,pr); e.hiWant=Math.min(e.dp,cdist(e.I,e.J,t)*1.25)<RING.hiR*SIZE; if(e.hiWant) e.hiAt=now;
+    for(const L of [0,1]){
+      if(L===1&&!e.hiWant) continue;
+      if(!e.lay[L]&&!e.loading[L]&&now-e.fail[L]>8000) jobs.push({e,L,pr:e.dp+(L?SIZE*0.6:0)});
+    }
+  });
+  // görünürlük
+  RING.tiles.forEach(e=>{
+    const on=want.has(e.key), lo=e.lay[0], hi=e.lay[1], showHi=!!(on&&hi&&(e.hiWant||!lo));
+    if(hi){ hi.mesh.visible=showHi; if(hi.sea) hi.sea.visible=showHi&&!hi.fading; }
+    if(lo){ lo.mesh.visible=on&&(!showHi||hi.fading); if(lo.sea) lo.sea.visible=lo.mesh.visible; }
+  });
+  jobs.sort((a,c)=>a.pr-c.pr);
+  for(const j of jobs){ if(RING.busy>=RING.maxBusy) break; ringLoad(j.e,j.L); }
+  // LRU: istenmeyen eski blokları ve fazla ayrıntılı katmanları at
+  if(RING.tiles.size>RING.cap){ for(const [k,e] of RING.tiles){ if(RING.tiles.size<=RING.cap) break; if(want.has(k)||e.loading[0]||e.loading[1]) continue; entDispose(e); RING.tiles.delete(k); } }
+  const his=[]; RING.tiles.forEach(e=>{ if(e.lay[1]&&!e.hiWant) his.push(e); });
+  let hiN=0; RING.tiles.forEach(e=>{ if(e.lay[1]) hiN++; });
+  his.sort((a,c)=>a.hiAt-c.hiAt);
+  for(const e of his){ if(hiN<=RING.hiCap) break; if(!e.lay[0]) continue; layDispose(e.lay[1]); e.lay[1]=null; hiN--; }
+}
+async function ringLoad(e,L){
+  const gen=RING.gen, P=RING.L[L], zd=REG.zd;
+  e.loading[L]=true; RING.busy++;
   try{
-    const zd=reg.zd, c={x:reg.cx+512*i, y:reg.cy+512*j};
-    // yükseklik: zd-2 (blok başına 1–4 karo), gerçek konumda çift doğrusal örnekleme
-    const zr=zd-2, DS=136, ox=Math.round(c.x/4)-DS/2, oy=Math.round(c.y/4)-DS/2;
-    const demC=await loadTiles(zr,ox+DS/2,oy+DS/2,DS,DEM_URL);
-    const tq=RING.tex/512, tz=zd+Math.log2(tq);
-    let satC=null; try{ satC=enhance(await loadTiles(tz,c.x*tq,c.y*tq,RING.tex,SAT_URL)); }catch(e){}
-    if(gen!==RING.gen||RING.tiles.get(key)!==tl) return;
-    const px=demC.getContext("2d").getImageData(0,0,DS,DS).data;
-    const dem=new Float32Array(DS*DS);
-    for(let k=0;k<DS*DS;k++) dem[k]=px[k*4]*256+px[k*4+1]+px[k*4+2]/256-32768;
-    const H=(X,Y)=>{ // X,Y: zd pikseli
-      const u=Math.max(0,Math.min(DS-1.001,X/4-ox-0.5)), v=Math.max(0,Math.min(DS-1.001,Y/4-oy-0.5));
-      const x0=Math.floor(u), y0=Math.floor(v), a=u-x0, e=v-y0, k=y0*DS+x0;
-      return (dem[k]*(1-a)+dem[k+1]*a)*(1-e)+(dem[k+DS]*(1-a)+dem[k+DS+1]*a)*e;
+    const f=2**(-P.dz), zr=zd+P.dz, w=512/f+3, ox=512*e.I/f-1, oy=512*e.J/f-1;
+    const dem=await demRegion(zr,ox,oy,w,w,false);
+    const tq=P.tex/512; let satC=null;
+    try{ satC=await compose(zd+Math.log2(tq),512*e.I*tq,512*e.J*tq,P.tex,SAT_URL,false,null,ENH); }catch(er){}
+    if(gen!==RING.gen||e.dead) return;
+    await idle();
+    if(gen!==RING.gen||e.dead) return;
+    const H=(X,Y)=>{ // X,Y: zd pikseli (sürekli), çift doğrusal
+      const u=Math.max(0,Math.min(w-1.001,X/f-0.5-ox)), v=Math.max(0,Math.min(w-1.001,Y/f-0.5-oy));
+      const x0=Math.floor(u), y0=Math.floor(v), a=u-x0, c=v-y0, k=y0*w+x0;
+      return (dem[k]*(1-a)+dem[k+1]*a)*(1-c)+(dem[k+w]*(1-a)+dem[k+w+1]*a)*c;
     };
-    // arazi ağı
-    const M=RING.M, pos=new Float32Array(M*M*3), uv=new Float32Array(M*M*2), hm=new Float32Array(M*M), idx=[];
+    const M=P.M, st=512/(M-1), X0=512*e.I, Y0=512*e.J;
+    const l={L,M,h0:new Float32Array(M*M),hm:new Float32Array(M*M)};
+    const pos=new Float32Array(M*M*3), uv=new Float32Array(M*M*2);
     for(let r=0;r<M;r++) for(let q=0;q<M;q++){
-      let X=c.x-256+512*q/(M-1), Y=c.y-256+512*r/(M-1);
-      const ax=Math.abs(X-reg.cx), ay=Math.abs(Y-reg.cy); let snap=false;
-      if(ax===256 && ay<=256){ X=reg.cx+Math.sign(X-reg.cx)*255; snap=true; }
-      if(ay===256 && ax<=256){ Y=reg.cy+Math.sign(Y-reg.cy)*255; snap=true; }
-      let h; if(snap) h=activeH(X,Y); else { h=H(X,Y); if(h<=0.3) h=Math.max(h,-3); }
-      const v=r*M+q; hm[v]=h;
-      pos[v*3]=(X-reg.cx)*RW; pos[v*3+2]=(Y-reg.cy)*RW;
-      uv[v*2]=(X-c.x+256)/512; uv[v*2+1]=1-(Y-c.y+256)/512;
+      const v=r*M+q; let h=H(X0+q*st,Y0+r*st); if(h<=0.3) h=Math.max(h,-3); l.h0[v]=h;
+      pos[v*3]=q*st*RW; pos[v*3+2]=r*st*RW; uv[v*2]=q/(M-1); uv[v*2+1]=1-r/(M-1);
     }
-    for(let r=0;r<M-1;r++) for(let q=0;q<M-1;q++){ const a=r*M+q; idx.push(a,a+M,a+1, a+1,a+M,a+M+1); }
-    const geo=new THREE.BufferGeometry();
-    geo.setAttribute("position",new THREE.BufferAttribute(pos,3)); geo.setAttribute("uv",new THREE.BufferAttribute(uv,2)); geo.setIndex(idx);
-    let mat;
-    if(satC){ const tx=new THREE.CanvasTexture(satC); tx.encoding=THREE.sRGBEncoding; tx.anisotropy=4; tx.wrapS=tx.wrapT=THREE.ClampToEdgeWrapping; mat=new THREE.MeshLambertMaterial({map:tx}); }
-    else mat=new THREE.MeshLambertMaterial({color:0x5a6650});
-    tl.mesh=new THREE.Mesh(geo,mat); tl.h=hm; scene.add(tl.mesh);
     // deniz maskesi (etkin bölgedeki stilize deniz gölgelendiricisiyle aynı)
-    const MR=128, sm=new Uint8Array(MR*MR), mk=new Uint8Array(MR*MR*4); let any=false;
-    for(let r=0;r<MR;r++) for(let q=0;q<MR;q++){ const s1=H(c.x-256+512*(q+.5)/MR, c.y-256+512*(r+.5)/MR)<=0.3; sm[r*MR+q]=s1; if(s1) any=true; }
+    await idle(); if(gen!==RING.gen||e.dead) return;
+    const MR=P.mr, sm=new Uint8Array(MR*MR); let any=false;
+    for(let r=0;r<MR;r++) for(let q=0;q<MR;q++){ const s1=H(X0+512*(q+.5)/MR, Y0+512*(r+.5)/MR)<=0.3; sm[r*MR+q]=s1; if(s1) any=true; }
+    const mk=any?seaMaskRGBA(sm,MR,512/MR/2):null;
+    await idle(); if(gen!==RING.gen||e.dead) return;
+    const idx=new (M*M>65535?Uint32Array:Uint16Array)((M-1)*(M-1)*6); let ii=0;
+    for(let r=0;r<M-1;r++) for(let q=0;q<M-1;q++){ const a=r*M+q; idx[ii++]=a; idx[ii++]=a+M; idx[ii++]=a+1; idx[ii++]=a+1; idx[ii++]=a+M; idx[ii++]=a+M+1; }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute("position",new THREE.BufferAttribute(pos,3)); geo.setAttribute("uv",new THREE.BufferAttribute(uv,2)); geo.setIndex(new THREE.BufferAttribute(idx,1));
+    // etek: kenar boyunca 3 birim aşağı inen şerit (komşu düzeyler/etkin bölge arasındaki çatlakları örter)
+    const per=[]; for(let q=0;q<M;q++) per.push(q); for(let r=1;r<M;r++) per.push(r*M+M-1);
+    for(let q=M-2;q>=0;q--) per.push((M-1)*M+q); for(let r=M-2;r>0;r--) per.push(r*M);
+    const sp=new Float32Array(per.length*6), su=new Float32Array(per.length*4), sn=new Float32Array(per.length*6), si=[];
+    per.forEach((v,s)=>{ for(const o of [0,3]){ sp[s*6+o]=pos[v*3]; sp[s*6+o+2]=pos[v*3+2]; sn[s*6+o+1]=1; }
+      su[s*4]=su[s*4+2]=uv[v*2]; su[s*4+1]=su[s*4+3]=uv[v*2+1];
+      const t0=2*s, b0=2*s+1, t1=2*((s+1)%per.length), b1=t1+1; si.push(t0,b0,t1, t1,b0,b1, t0,t1,b0, t1,b1,b0); });
+    const sg=new THREE.BufferGeometry();
+    sg.setAttribute("position",new THREE.BufferAttribute(sp,3)); sg.setAttribute("normal",new THREE.BufferAttribute(sn,3)); sg.setAttribute("uv",new THREE.BufferAttribute(su,2)); sg.setIndex(si);
+    let mat;
+    if(satC){ const tx=new THREE.CanvasTexture(satC); tx.encoding=THREE.sRGBEncoding; tx.anisotropy=4; tx.wrapS=tx.wrapT=THREE.ClampToEdgeWrapping; renderer.initTexture(tx); mat=new THREE.MeshLambertMaterial({map:tx}); }
+    else mat=new THREE.MeshLambertMaterial({color:0x5a6650});
+    mat.onBeforeCompile=holeOBC;
+    if(L===1){ mat.polygonOffset=true; mat.polygonOffsetFactor=-1; mat.polygonOffsetUnits=-1; }
+    l.mesh=new THREE.Mesh(geo,mat); l.skirt=new THREE.Mesh(sg,mat); l.mesh.add(l.skirt); l.per=per;
     if(any){
-      const dist=new Float32Array(MR*MR).fill(1e9), qq=[], nb=(k,f)=>{ const x=k%MR; if(x>0)f(k-1); if(x<MR-1)f(k+1); if(k>=MR)f(k-MR); if(k<MR*MR-MR)f(k+MR); };
-      for(let k=0;k<MR*MR;k++) if(sm[k]) nb(k,o=>{ if(!sm[o]&&dist[k]){ dist[k]=0; qq.push(k); } });
-      for(let h=0;h<qq.length;h++){ const k=qq[h]; nb(k,o=>{ if(sm[o]&&dist[o]>dist[k]+1){ dist[o]=dist[k]+1; qq.push(o); } }); }
-      const cr=512/MR/2; // maske hücresi / etkin hücre
-      for(let r=0;r<MR;r++) for(let q=0;q<MR;q++){
-        const k=r*MR+q, o=((MR-1-r)*MR+q)*4;
-        let m=sm[k]?255:0; if(!sm[k]){ let n4=0; nb(k,o2=>{ n4+=sm[o2]; }); m=n4?Math.min(200,70*n4):0; }
-        mk[o]=m; mk[o+1]=sm[k]?Math.min(255,dist[k]*cr/22*255):0; mk[o+3]=255;
-      }
       const mt=new THREE.DataTexture(mk,MR,MR,THREE.RGBAFormat); mt.magFilter=mt.minFilter=THREE.LinearFilter; mt.needsUpdate=true;
-      const smat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4,vertexShader:seaMat.vertexShader,fragmentShader:seaMat.fragmentShader,
-        uniforms:{uTime:seaMat.uniforms.uTime, uMask:{value:mt}}});
-      tl.sea=new THREE.Mesh(new THREE.PlaneGeometry(512*RW,512*RW),smat);
-      tl.sea.rotation.x=-Math.PI/2; tl.sea.position.set(512*i*RW,0.02,512*j*RW); tl.sea.renderOrder=0.5; scene.add(tl.sea);
+      const smat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4,
+        vertexShader:seaMat.vertexShader,fragmentShader:ringSeaFrag,uniforms:{uTime:seaMat.uniforms.uTime, uMask:{value:mt}, uHole:SEAHOLE}});
+      l.sea=new THREE.Mesh(new THREE.PlaneGeometry(512*RW,512*RW),smat);
+      l.sea.rotation.x=-Math.PI/2; l.sea.renderOrder=0.5; l.sea.visible=false; scene.add(l.sea);
     }
-    ringScaleTile(tl);
-  }catch(e){ tl.fail=true; } // başarısız blok haritada kalır; uzaklaşınca silinir, sonra yeniden denenir
-  finally{ if(gen===RING.gen) RING.busy--; }
+    layBlend(e,l); layScale(l); layPlace(e,l);
+    e.lay[L]=l; scene.add(l.mesh);
+    // ayrıntılı katman: kaba katmanın üstünde kısa bir saydamlık geçişiyle belirir
+    if(L===1&&e.lay[0]&&e.lay[0].mesh.visible){ mat.transparent=true; mat.opacity=0; l.fading=true; RING.fades.push(l); l.mesh.visible=true; }
+    else l.mesh.visible=false;
+    RING.acc=1; // görünürlüğü hemen güncelle
+  }catch(er){ e.fail[L]=performance.now(); }
+  finally{ e.loading[L]=false; if(gen===RING.gen) RING.busy--; }
 }
-function ringScaleTile(tl){
-  if(!tl.mesh) return;
-  const p=tl.mesh.geometry.attributes.position, k=sc()*S.ex;
-  for(let v=0;v<tl.h.length;v++) p.array[v*3+1]=tl.h[v]*k;
-  p.needsUpdate=true; tl.mesh.geometry.computeVertexNormals(); tl.mesh.geometry.computeBoundingSphere();
+function ringFrame(rdt){
+  const rb=RING.reblend.shift(); if(rb&&!rb[0].dead&&rb[0].lay.includes(rb[1])){ layBlend(rb[0],rb[1]); layScale(rb[1]); }
+  if(!RING.fades.length) return;
+  RING.fades=RING.fades.filter(l=>{
+    const m=l.mesh.material; m.opacity=Math.min(1,m.opacity+rdt/0.35);
+    if(m.opacity<1) return true;
+    m.transparent=false; m.needsUpdate=true; l.fading=false; RING.acc=1; return false;
+  });
 }
-function ringRescale(){ RING.tiles.forEach(ringScaleTile); }
 
 // ================= Etkin pencereyi kaydırma =================
-// Otomatik: hedef ~0,8 sn kenar bölgesinde (%15) kalırsa ve kamera sürüklenmiyor/kaymıyorsa pencere oraya taşınır.
-// Döngü olmasın: kaydırmadan sonra hedef yeni bölgenin ortasına (%25) dönene kadar yeniden tetiklenmez.
-let camDrag=false, edgeSince=0, shiftArmed=true, toastTm=0;
-const _lastT=new THREE.Vector3();
-renderer.domElement.addEventListener("pointerdown",()=>camDrag=true);
-["pointerup","pointercancel"].forEach(ev=>addEventListener(ev,()=>camDrag=false));
+// Otomatik: hedef kenara %25 yaklaşınca yeni blok, kameranın gideceği yere (hız tahmini) ortalanarak arka planda
+// hazırlanır; kamera hiç beklemez. Döngü olmasın: yeni merkez hedefe en fazla %18 uzakta seçilir ve hedef
+// yeniden iç bölgeye (%22) girene ya da kamera ~%12 daha ilerleyene kadar tetiklenmez.
+let shiftArmed=true, shiftAt=new THREE.Vector3(), edgeSince=0, toastTm=0, shiftMsg="", shiftTo="";
 function toast(msg,ms){
   const el=$("toast"); clearTimeout(toastTm);
   if(!msg){ el.classList.remove("on"); return; }
@@ -1224,31 +1353,32 @@ function toast(msg,ms){
 }
 function shiftTick(now){
   const bt=$("shiftBtn"), t=controls.target;
-  const still=_lastT.distanceToSquared(t)<1e-4; _lastT.copy(t);
   if(!S.loaded||!REG){ bt.hidden=true; return; }
   if(shiftBusy) return;
-  const e=Math.max(Math.abs(t.x),Math.abs(t.z))/SIZE, edge=e>=0.35; // kenara %15 kala
-  if(e<0.25) shiftArmed=true;
+  const e=Math.max(Math.abs(t.x),Math.abs(t.z))/SIZE, edge=e>=0.25; // kenara %25 kala
+  if(e<0.22 || t.distanceTo(shiftAt)>SIZE*0.12) shiftArmed=true; // ortaya döndü ya da kamera ilerlemeye devam ediyor
   if(!$("autoShift").checked){ bt.hidden=!edge; edgeSince=0; return; }
   bt.hidden=true;
-  if(!edge||!shiftArmed||camDrag||fly||!still){ edgeSince=0; return; }
+  if(!edge||!shiftArmed){ edgeSince=0; return; }
   if(!edgeSince) edgeSince=now;
-  else if(now-edgeSince>800){ edgeSince=0; shiftHere(); }
+  else if(now-edgeSince>150){ edgeSince=0; shiftHere(); }
 }
-let shiftMsg="";
 function shiftProg(f){
-  if(f<0){ shiftBusy=false; $("shiftBtn").disabled=false; $("shiftBtn").textContent="Bu bölgeye geç →"; toast("Bölge yüklenemedi (bağlantıyı kontrol et).",3500); return; }
+  if(f<0){ shiftAt.copy(controls.target); shiftBusy=false; $("shiftBtn").disabled=false; toast("Bölge yüklenemedi (bağlantıyı kontrol et).",3500); return; }
   toast(`${shiftMsg} · %${Math.round(f*100)}`);
 }
-async function shiftHere(){
+function shiftDone(){ shiftAt.copy(controls.target); shiftBusy=false; $("shiftBtn").disabled=false; toast(`${shiftTo} · simülasyon alanı taşındı, su korundu`,2200); }
+function shiftHere(){
   if(shiftBusy||!S.loaded) return;
-  const f=SIZE/(N-1), t=controls.target, sx=Math.round(t.x/f), sy=Math.round(t.z/f);
+  const f=SIZE/(N-1), t=controls.target, p=RING.pred, m=SIZE*0.18;
+  const wx=t.x+Math.max(-m,Math.min(m,p.x-t.x)), wz=t.z+Math.max(-m,Math.min(m,p.z-t.z));
+  const sx=Math.round(wx/f), sy=Math.round(wz/f);
   if(!sx&&!sy) return;
-  const ll=px2ll(REG.cx+2*sx,REG.cy+2*sy,REG.n), from=S.name.replace(/ Deresi$/,""), to=nearestSuburb(ll.lat,ll.lon)||"yeni alan";
-  shiftMsg=`${from} → ${to} · kaydırılıyor…`;
+  const ll=px2ll(REG.cx+2*sx,REG.cy+2*sy,REG.n), from=S.name.replace(/ Deresi$/,"");
+  shiftTo=nearestSuburb(ll.lat,ll.lon)||"yeni alan";
+  shiftMsg=`${from} → ${shiftTo} · hazırlanıyor`;
   shiftBusy=true; shiftArmed=false; $("shiftBtn").disabled=true; $("shiftBtn").hidden=true; shiftProg(0);
-  await loadRegion({sx,sy});
-  if(shiftBusy){ shiftBusy=false; $("shiftBtn").disabled=false; toast(`${to} · simülasyon alanı taşındı, su korundu`,2500); }
+  loadRegion({sx,sy});
 }
 
 function buildScene(keepCam){
@@ -1275,19 +1405,40 @@ function buildScene(keepCam){
   waterMesh=new THREE.Mesh(wg,new THREE.MeshPhongMaterial({map:waterTex,transparent:true,depthWrite:false,shininess:80,specular:0x333333}));
   waterMesh.rotation.x=-Math.PI/2; waterMesh.renderOrder=1; scene.add(waterMesh);
   seaMesh.visible = sea.some(v=>v); updateSeaMask();
+  // etek: etkin arazinin kenarından aşağı inen şerit (çevre bloklarıyla aradaki küçük yükseklik farkını örter)
+  if(skirtMesh){ scene.remove(skirtMesh); skirtMesh.geometry.dispose(); }
+  { const per=[]; for(let x=0;x<N;x++) per.push(x); for(let y=1;y<N;y++) per.push(y*N+N-1); for(let x=N-2;x>=0;x--) per.push((N-1)*N+x); for(let y=N-2;y>0;y--) per.push(y*N);
+    const sp=new Float32Array(per.length*6), sn=new Float32Array(per.length*6), su=new Float32Array(per.length*4), si=[], tuv=tg.attributes.uv;
+    per.forEach((i,s)=>{ const x=i%N, y=(i-x)/N; for(const o of [0,3]){ sp[s*6+o]=(x/(N-1)-.5)*SIZE; sp[s*6+o+2]=(y/(N-1)-.5)*SIZE; sn[s*6+o+1]=1; }
+      su[s*4]=su[s*4+2]=tuv.getX(i); su[s*4+1]=su[s*4+3]=tuv.getY(i);
+      const t0=2*s, b0=t0+1, t1=2*((s+1)%per.length), b1=t1+1; si.push(t0,b0,t1, t1,b0,b1, t0,t1,b0, t1,b1,b0); });
+    const sg=new THREE.BufferGeometry(); sg.setAttribute("position",new THREE.BufferAttribute(sp,3)); sg.setAttribute("normal",new THREE.BufferAttribute(sn,3)); sg.setAttribute("uv",new THREE.BufferAttribute(su,2)); sg.setIndex(si);
+    skirtMesh=new THREE.Mesh(sg,terrainMesh.material); skirtMesh.userData.per=per; scene.add(skirtMesh); }
   rebuildTerrainZ(); drawDereOverlay();
   if(!keepCam){ controls.target.set(0,0,0); camera.position.set(0,140,180); }
 }
-function rebuildTerrainZ(){
+// arka planda hazırlanan konum/normal dizileri (kaydırmada tek karede yalnız kopyalanır)
+let tgScratch=null;
+function terrainArrays(b,sea,k){
+  if(!tgScratch) tgScratch=new THREE.PlaneGeometry(SIZE,SIZE,N-1,N-1);
+  const p=tgScratch.attributes.position;
+  for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k);
+  tgScratch.computeVertexNormals();
+  return {k, pos:p.array.slice(), nrm:tgScratch.attributes.normal.array.slice()};
+}
+function rebuildTerrainZ(pre,skipRing){
   const p=terrainMesh.geometry.attributes.position, k=sc()*S.ex;
-  for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k); // deniz tabanı sığ: duvar oluşmasın
-  p.needsUpdate=true; terrainMesh.geometry.computeVertexNormals();
+  if(pre && Math.abs(pre.k-k)<1e-9){ p.array.set(pre.pos); terrainMesh.geometry.attributes.normal.array.set(pre.nrm); terrainMesh.geometry.attributes.normal.needsUpdate=true; }
+  else { for(let i=0;i<N*N;i++) p.setZ(i,(sea[i]?Math.max(b[i],-3):b[i])*k); terrainMesh.geometry.computeVertexNormals(); } // deniz tabanı sığ: duvar oluşmasın
+  p.needsUpdate=true; terrainMesh.geometry.computeBoundingSphere();
+  if(skirtMesh){ const sp=skirtMesh.geometry.attributes.position; skirtMesh.userData.per.forEach((i,s)=>{ const y=p.getZ(i); sp.array[s*6+1]=y; sp.array[s*6+4]=y-3; }); sp.needsUpdate=true; skirtMesh.geometry.computeBoundingSphere(); }
   if(bldMesh) bldMesh.scale.y=k;
-  updateWaterMesh(); ringRescale();
+  updateWaterMesh(); if(!skipRing) ringRescale();
 }
 async function applyTexture(){
   if(!terrainMesh) return;
   const mode=$("tex").value;
+  if(!elevCanvas && (mode==='elev'||mode==='satelev'||!satCanvas)) elevCanvas=makeElevCanvas(b,sea,S.cell);
   let src=elevCanvas;
   if(mode!=="elev" && satCanvas) src=satCanvas;
   if(mode==="satelev" && satCanvas){
@@ -1310,10 +1461,14 @@ async function applyTexture(){
     }
     if(roadCanvas) src=roadCanvas;
   }
+  setTerrainTex(makeTerrainTex(src));
+}
+function makeTerrainTex(src){
+  const t=new THREE.CanvasTexture(src); t.encoding=THREE.sRGBEncoding; t.anisotropy=renderer.capabilities.getMaxAnisotropy(); return t;
+}
+function setTerrainTex(t){
   if(terrainTex) terrainTex.dispose();
-  terrainTex=new THREE.CanvasTexture(src); terrainTex.encoding=THREE.sRGBEncoding;
-  terrainTex.anisotropy=renderer.capabilities.getMaxAnisotropy();
-  terrainMesh.material.map=terrainTex; terrainMesh.material.needsUpdate=true;
+  terrainTex=t; terrainMesh.material.map=t; terrainMesh.material.needsUpdate=true;
 }
 function updateWaterMesh(){
   const p=waterMesh.geometry.attributes.position, k=sc()*S.ex;
@@ -1553,8 +1708,8 @@ function loop(now){
   updateSea(now/1000);
   updateRain(rdt);
   updateFlow(rdt);
-  bldAcc+=rdt; if(bldAcc>0.5){ bldAcc=0; bldTick(); ringTick(); }
-  shiftTick(now);
+  bldAcc+=rdt; if(bldAcc>0.5){ bldAcc=0; bldTick(); }
+  ringTick(rdt); ringFrame(rdt); shiftTick(now);
   controls.update();
   updateLabels();
   renderer.render(scene,camera);
@@ -1569,7 +1724,7 @@ function setView(polar,az,dist,target){
   fly={t:0,fromT:controls.target.clone(),toT:t,fromP:camera.position.clone(),toP:p};
 }
 $("shiftBtn").onclick=shiftHere;
-$("ringOn").onchange=e=>{ RING.on=e.target.checked; ringTick(); };
+$("ringOn").onchange=e=>{ RING.on=e.target.checked; RING.acc=1; };
 $("nNorth").onclick=()=>setView(controls.getPolarAngle(),0,camDist());
 $("nIn").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.max(6,camDist()*0.6));
 $("nOut").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngle(),Math.min(500,camDist()*1.6));
