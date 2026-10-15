@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>İstanbul Yağış Simülasyonu</title>
+<style>
+:root{
+  --bg:#eef2f6; --panel:#ffffff; --ink:#15202b; --muted:#5b6b7b; --line:#d5dde5;
+  --accent:#1f6feb; --accent-soft:#dbe8ff; --water:#2f80ed; --water2:#5aa7ff;
+  --sky1:#9fb3c8; --sky2:#d9e2ec; --ground:#7a8a74; --rain:rgba(40,70,110,.55);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#8b98a5; --line:#2a323c;
+    --accent:#58a6ff; --accent-soft:#1c2c45; --water:#2f6fd0; --water2:#4c8fe8;
+    --sky1:#0b1320; --sky2:#1d2a3a; --ground:#2c3a2c; --rain:rgba(170,200,240,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#8b98a5; --line:#2a323c;
+  --accent:#58a6ff; --accent-soft:#1c2c45; --water:#2f6fd0; --water2:#4c8fe8;
+  --sky1:#0b1320; --sky2:#1d2a3a; --ground:#2c3a2c; --rain:rgba(170,200,240,.55);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{max-width:1200px;margin:0 auto;padding:20px 16px 8px}
+h1{margin:0;font-size:24px}
+header p{margin:4px 0 0;color:var(--muted)}
+main{max-width:1200px;margin:0 auto;padding:8px 16px 32px;display:grid;grid-template-columns:320px 1fr;gap:16px}
+@media (max-width:860px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+.ctrl{margin-bottom:14px}
+.ctrl label{display:flex;justify-content:space-between;font-weight:600;margin-bottom:6px}
+.ctrl label span{font-weight:500;color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--bg);padding:4px;border-radius:10px;margin-bottom:14px}
+.tabs button{border:0;background:transparent;color:var(--ink);padding:7px 4px;border-radius:7px;font:inherit;font-size:13px;cursor:pointer}
+.tabs button.on{background:var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:600}
+.btns{display:flex;gap:8px}
+.btn{flex:1;border:0;border-radius:10px;padding:10px;font:inherit;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.btn.ghost{background:var(--accent-soft);color:var(--accent)}
+.stage{position:relative;padding:0;overflow:hidden}
+canvas{display:block;width:100%;height:460px;border-radius:14px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.eq{margin-top:16px}
+.eq ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media (max-width:640px){.eq ul{grid-template-columns:1fr}}
+.eq li{background:var(--bg);border-radius:10px;padding:8px 10px;font-variant-numeric:tabular-nums}
+.eq b{font-size:17px}
+.months{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:130px;margin-top:6px}
+.mbar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer}
+.mbar i{display:block;width:100%;background:var(--water2);border-radius:4px 4px 0 0;opacity:.55;transition:opacity .2s}
+.mbar.on i{opacity:1;background:var(--accent)}
+.mbar small{font-size:10px;color:var(--muted);margin-top:3px}
+.note{font-size:12px;color:var(--muted);margin-top:10px}
+.info{margin-top:10px;padding:10px;border-radius:10px;background:var(--accent-soft);font-size:13px}
+.theme{position:absolute;top:10px;right:10px;border:0;border-radius:8px;padding:6px 9px;background:rgba(0,0,0,.35);color:#fff;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌧️ İstanbul'da Metrekareye Düşen Yağış</h1>
+  <p>1 mm yağış = 1 m²'ye 1 litre su. Ayarları değiştir, yağmuru başlat, depoyu dolarken izle.</p>
+</header>
+
+<main>
+  <aside class="card">
+    <div class="tabs" id="tabs">
+      <button data-mode="rate" class="on">Yağış şiddeti</button>
+      <button data-mode="month">Aylık</button>
+      <button data-mode="year">Bir yıl</button>
+    </div>
+
+    <div id="rateCtrls">
+      <div class="ctrl">
+        <label>Hazır senaryolar</label>
+        <div class="chips" id="presets"></div>
+      </div>
+      <div class="ctrl">
+        <label>Yağış şiddeti <span id="rateVal"></span></label>
+        <input type="range" id="rate" min="0.5" max="120" step="0.5" value="10">
+      </div>
+      <div class="ctrl">
+        <label>Zaman hızı <span id="speedVal"></span></label>
+        <input type="range" id="speed" min="0" max="6" step="1" value="3">
+      </div>
+      <div class="ctrl">
+        <label>Süre</label>
+        <select id="dur">
+          <option value="0">Durdurana kadar</option>
+          <option value="10">10 dakika</option>
+          <option value="60" selected>1 saat</option>
+          <option value="360">6 saat</option>
+          <option value="1440">24 saat</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="monthCtrls" hidden>
+      <div class="ctrl">
+        <label>Ay seç (ortalama yağış)</label>
+        <div class="months" id="months"></div>
+      </div>
+      <div class="info" id="monthInfo"></div>
+    </div>
+
+    <div id="yearCtrls" hidden>
+      <div class="info">Ocak'tan Aralık'a bir yılın yağışı 1 m²'lik depoya dökülür. Her ay ~2 saniye sürer.</div>
+    </div>
+
+    <div class="ctrl" style="margin-top:14px">
+      <label>Alan</label>
+      <select id="area">
+        <option value="1" selected>1 m² (tek metrekare)</option>
+        <option value="10">10 m² (balkon)</option>
+        <option value="120">120 m² (apartman çatısı)</option>
+        <option value="7140">7.140 m² (futbol sahası)</option>
+        <option value="25000000">25 km² (Kadıköy ilçesi)</option>
+        <option value="5343000000">5.343 km² (tüm İstanbul ili)</option>
+      </select>
+    </div>
+    <div class="ctrl">
+      <label>Rüzgâr <span id="windVal"></span></label>
+      <input type="range" id="wind" min="-10" max="10" step="1" value="2">
+    </div>
+
+    <div class="btns">
+      <button class="btn" id="play">▶ Başlat</button>
+      <button class="btn ghost" id="reset">↺ Sıfırla</button>
+    </div>
+    <p class="note">Aylık değerler İstanbul için uzun yıllar ortalamasına yakın yuvarlatılmış değerlerdir (~800 mm/yıl). Semtten semte (ör. Sarıyer daha yağışlı, Florya daha kurak) farklılık gösterir.</p>
+  </aside>
+
+  <section>
+    <div class="card stage">
+      <canvas id="cv"></canvas>
+      <button class="theme" id="themeBtn">◐ Tema</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Geçen süre</div><div class="v" id="sTime">0 dk</div></div>
+      <div class="stat"><div class="k">Toplam yağış</div><div class="v" id="sMm">0 mm</div></div>
+      <div class="stat"><div class="k">1 m²'ye düşen</div><div class="v" id="sL">0 L</div></div>
+      <div class="stat"><div class="k">Seçili alana düşen</div><div class="v" id="sArea">0 L</div></div>
+    </div>
+
+    <div class="card eq">
+      <h2>Bu ne kadar su?</h2>
+      <ul id="eqList"></ul>
+    </div>
+  </section>
+</main>
+
+<script>
+const MONTHS = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+const MONTH_FULL = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+const MONTH_MM = [100,78,70,46,33,36,22,37,55,92,103,120]; // yaklaşık ortalamalar (mm)
+const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+const PRESETS = [
+  {n:"Çiseleme", r:1},
+  {n:"Hafif yağmur", r:2.5},
+  {n:"Orta yağmur", r:6},
+  {n:"Kuvvetli", r:20},
+  {n:"Sağanak", r:50},
+  {n:"Sel yapan sağanak", r:100},
+];
+const SPEEDS = [ // simüle dakika / gerçek saniye
+  {v:1/60, t:"gerçek zaman"},{v:0.5,t:"30×"},{v:2,t:"120×"},{v:5,t:"1 sn = 5 dk"},
+  {v:15,t:"1 sn = 15 dk"},{v:60,t:"1 sn = 1 saat"},{v:240,t:"1 sn = 4 saat"}
+];
+
+const $ = id => document.getElementById(id);
+const S = {
+  mode:"rate", running:false, rate:10, speed:5, durMin:60, area:1, wind:2,
+  simMin:0, mm:0, month:0, // month mode
+  yearT:0, // year mode real seconds
+  progT:0, // month mode real seconds
+  flash:0, scaleMax:10
+};
+
+// ---------- UI ----------
+function fmtNum(x, d=0){ return x.toLocaleString("tr-TR",{maximumFractionDigits:d, minimumFractionDigits:0}); }
+function fmtL(L){
+  if (L >= 1e9) return fmtNum(L/1e9,2)+" milyar L";
+  if (L >= 1e6) return fmtNum(L/1e6,2)+" milyon L";
+  if (L >= 1e4) return fmtNum(L/1e3,1)+" bin L";
+  return fmtNum(L, L<10?2:1)+" L";
+}
+function fmtTime(min){
+  if (S.mode!=="rate"){
+    const d = min/1440; return fmtNum(d,0)+" gün";
+  }
+  if (min < 1) return fmtNum(min*60,0)+" sn";
+  if (min < 60) return fmtNum(min,0)+" dk";
+  const h=Math.floor(min/60), m=Math.floor(min%60);
+  return h+" sa "+(m?m+" dk":"");
+}
+
+PRESETS.forEach(p=>{
+  const b=document.createElement("button"); b.className="chip"; b.textContent=p.n+" · "+p.r;
+  b.onclick=()=>{ $("rate").value=p.r; onRate(); };
+  b.dataset.r=p.r; $("presets").appendChild(b);
+});
+const maxM = Math.max(...MONTH_MM);
+MONTH_MM.forEach((mm,i)=>{
+  const d=document.createElement("div"); d.className="mbar"+(i===0?" on":"");
+  d.innerHTML=`<i style="height:${mm/maxM*100}%"></i><small>${MONTHS[i]}</small>`;
+  d.title=`${MONTH_FULL[i]}: ~${mm} mm`;
+  d.onclick=()=>{ S.month=i; document.querySelectorAll(".mbar").forEach((x,j)=>x.classList.toggle("on",j===i)); resetSim(); updMonthInfo(); };
+  $("months").appendChild(d);
+});
+function updMonthInfo(){
+  const mm=MONTH_MM[S.month];
+  $("monthInfo").innerHTML=`<b>${MONTH_FULL[S.month]}</b> ayında İstanbul'da ortalama <b>~${mm} mm</b> yağış düşer → 1 m²'ye <b>~${mm} litre</b>, yani yaklaşık <b>${fmtNum(mm/10,1)} kova</b> (10 L).`;
+}
+updMonthInfo();
+
+function intensityName(r){
+  if (r<2.5) return "hafif"; if (r<7.6) return "orta"; if (r<50) return "kuvvetli"; return "şiddetli";
+}
+function onRate(){
+  S.rate=+$("rate").value;
+  $("rateVal").textContent=S.rate+" mm/saat ("+intensityName(S.rate)+")";
+  document.querySelectorAll("#presets .chip").forEach(c=>c.classList.toggle("on",+c.dataset.r===S.rate));
+}
+function onSpeed(){ const s=SPEEDS[+$("speed").value]; S.speed=s.v; $("speedVal").textContent=s.t; }
+function onWind(){ S.wind=+$("wind").value; $("windVal").textContent=S.wind===0?"yok":(Math.abs(S.wind)*5)+" km/sa "+(S.wind>0?"→":"←"); }
+$("rate").oninput=onRate; $("speed").oninput=onSpeed; $("wind").oninput=onWind;
+$("dur").onchange=()=>S.durMin=+$("dur").value;
+$("area").onchange=()=>{S.area=+$("area").value; updStats();};
+onRate(); onSpeed(); onWind();
+
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===b));
+  S.mode=b.dataset.mode;
+  $("rateCtrls").hidden=S.mode!=="rate"; $("monthCtrls").hidden=S.mode!=="month"; $("yearCtrls").hidden=S.mode!=="year";
+  resetSim();
+});
+$("play").onclick=()=>{
+  if (!S.running && finished()) resetSim();
+  S.running=!S.running; updPlay();
+};
+$("reset").onclick=()=>{ resetSim(); };
+function updPlay(){ $("play").textContent=S.running?"⏸ Duraklat":"▶ Başlat"; }
+function resetSim(){
+  S.simMin=0; S.mm=0; S.progT=0; S.yearT=0; S.running=false; S.scaleMax=10;
+  drops.length=0; splashes.length=0; updPlay(); updStats();
+}
+function finished(){
+  if (S.mode==="rate") return S.durMin>0 && S.simMin>=S.durMin;
+  if (S.mode==="month") return S.progT>=MONTH_T;
+  return S.yearT>=12*YEAR_MT;
+}
+$("themeBtn").onclick=()=>{
+  const r=document.documentElement;
+  const dark = r.dataset.theme ? r.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark"; readColors();
+};
+
+// ---------- Stats ----------
+const MONTH_T = 8;      // ay modunda gerçek saniye
+const YEAR_MT = 2;      // yıl modunda her ay gerçek saniye
+const ISTANBUL_DAILY_L = 3.0e9; // ~3 milyon m³/gün su tüketimi (yaklaşık)
+function updStats(){
+  $("sTime").textContent=fmtTime(S.simMin);
+  $("sMm").textContent=fmtNum(S.mm, S.mm<10?2:1)+" mm";
+  $("sL").textContent=fmtL(S.mm);
+  const L=S.mm*S.area;
+  $("sArea").textContent=fmtL(L);
+  const items=[
+    ["🪣","kova (10 L)", L/10],
+    ["🛁","küvet (150 L)", L/150],
+    ["⚖️","ton su ağırlığı", L/1000],
+    ["🚚","su tankeri (30 ton)", L/30000],
+    ["🏊","olimpik havuz (2.500 ton)", L/2.5e6],
+    ["🏙️","İstanbul'un günlük su tüketimi (~3 milyon ton)", L/ISTANBUL_DAILY_L],
+  ];
+  $("eqList").innerHTML=items.map(([e,n,v])=>`<li>${e} <b>${v>=100?fmtNum(v,0):(v>0&&v<0.001?"&lt;0,001":fmtNum(v,v<1?3:1))}</b> ${n}</li>`).join("");
+}
+updStats();
+
+// ---------- Canvas ----------
+const cv=$("cv"), ctx=cv.getContext("2d");
+let W=0,H=0,DPR=1, C={};
+function readColors(){
+  const cs=getComputedStyle(document.documentElement);
+  ["sky1","sky2","ground","water","water2","rain","ink","muted","panel"].forEach(k=>C[k]=cs.getPropertyValue("--"+k).trim());
+}
+function resize(){
+  DPR=window.devicePixelRatio||1;
+  const r=cv.getBoundingClientRect(); W=r.width; H=r.height;
+  cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener("resize",resize);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",readColors);
+readColors(); resize();
+
+const drops=[], splashes=[];
+function tank(){
+  const tw=Math.min(W*0.42,320), th=Math.min(H*0.62,300);
+  const groundY=H-46;
+  return {x:(W-tw)/2, y:groundY-th, w:tw, h:th, groundY};
+}
+function currentRate(){ // mm/saat — görsel yoğunluk için
+  if (S.mode==="rate") return S.rate;
+  if (S.mode==="month") return 4+MONTH_MM[S.month]/6;
+  const m=Math.min(11,Math.floor(S.yearT/YEAR_MT)); return 3+MONTH_MM[m]/6;
+}
+const NICE=[10,25,50,100,250,500,1000,2500];
+
+let last=performance.now(), spawnAcc=0;
+function step(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+
+  // --- simulate ---
+  if (S.running){
+    if (S.mode==="rate"){
+      let add=S.speed*dt;
+      if (S.durMin>0) add=Math.min(add,S.durMin-S.simMin);
+      S.simMin+=add; S.mm+=S.rate*add/60;
+    } else if (S.mode==="month"){
+      S.progT=Math.min(MONTH_T,S.progT+dt);
+      const f=S.progT/MONTH_T;
+      S.mm=MONTH_MM[S.month]*f; S.simMin=MONTH_DAYS[S.month]*1440*f;
+    } else {
+      S.yearT=Math.min(12*YEAR_MT,S.yearT+dt);
+      const m=Math.floor(S.yearT/YEAR_MT), fr=(S.yearT%YEAR_MT)/YEAR_MT;
+      let mm=0, days=0;
+      for(let i=0;i<12;i++){ if(i<m){mm+=MONTH_MM[i];days+=MONTH_DAYS[i];} else if(i===m){mm+=MONTH_MM[i]*fr;days+=MONTH_DAYS[i]*fr;} }
+      S.mm=mm; S.simMin=days*1440;
+    }
+    if (finished()){ S.running=false; updPlay(); }
+    updStats();
+    if (S.mode==="year") highlightYearMonth();
+  }
+  const target=NICE.find(n=>n>S.mm*1.15)||NICE[NICE.length-1];
+  S.scaleMax+=(target-S.scaleMax)*Math.min(1,dt*3);
+
+  // --- particles ---
+  const T=tank(), rate=currentRate(), windVx=S.wind*28;
+  if (S.running){
+    spawnAcc+=dt*Math.min(900, 25+rate*14);
+    while(spawnAcc>=1){ spawnAcc--;
+      const len=8+Math.min(18,rate*0.25);
+      drops.push({x:Math.random()*(W+Math.abs(windVx)*1.2)-(windVx>0?windVx*1.2:0), y:-20-Math.random()*40, vy:520+Math.random()*260+rate*2, len});
+    }
+    if (rate>=50 && Math.random()<dt*0.12) S.flash=1;
+  }
+  const waterY=T.y+T.h-Math.min(1,S.mm/S.scaleMax)*T.h;
+  for(let i=drops.length-1;i>=0;i--){
+    const d=drops[i]; d.y+=d.vy*dt; d.x+=windVx*dt;
+    const inTank=d.x>T.x+3 && d.x<T.x+T.w-3;
+    const hitY= inTank ? waterY : T.groundY;
+    if (d.y>=hitY){
+      splashes.push({x:d.x,y:hitY,t:0,water:inTank});
+      drops.splice(i,1);
+    }
+  }
+  for(let i=splashes.length-1;i>=0;i--){ splashes[i].t+=dt; if(splashes[i].t>0.35) splashes.splice(i,1); }
+  S.flash=Math.max(0,S.flash-dt*2.5);
+
+  draw(T,waterY,windVx,now);
+  requestAnimationFrame(step);
+}
+
+function highlightYearMonth(){
+  const m=Math.min(11,Math.floor(S.yearT/YEAR_MT));
+  document.querySelectorAll(".mbar").forEach((x,j)=>x.classList.toggle("on",j===m));
+}
+
+function draw(T,waterY,windVx,now){
+  // sky
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,C.sky1); g.addColorStop(1,C.sky2);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // skyline silhouette (Galata + cami siluetleri, stilize)
+  drawSkyline(T.groundY);
+  // ground
+  ctx.fillStyle=C.ground; ctx.fillRect(0,T.groundY,W,H-T.groundY);
+
+  // rain
+  ctx.strokeStyle=C.rain; ctx.lineWidth=1.3; ctx.beginPath();
+  const sx=windVx/700;
+  for(const d of drops){ ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-sx*d.len*1.6,d.y-d.len); }
+  ctx.stroke();
+
+  // tank back
+  ctx.fillStyle="rgba(255,255,255,.08)"; ctx.fillRect(T.x,T.y,T.w,T.h);
+  // water
+  const wh=T.y+T.h-waterY;
+  if (wh>0.5){
+    const wg=ctx.createLinearGradient(0,waterY,0,T.y+T.h); wg.addColorStop(0,C.water2); wg.addColorStop(1,C.water);
+    ctx.fillStyle=wg; ctx.beginPath(); ctx.moveTo(T.x,T.y+T.h);
+    const amp=S.running?Math.min(3,1+currentRate()/40):0.6;
+    for(let x=0;x<=T.w;x+=4){ ctx.lineTo(T.x+x, waterY+Math.sin(x/18+now/260)*amp+Math.sin(x/7+now/170)*amp*0.4); }
+    ctx.lineTo(T.x+T.w,T.y+T.h); ctx.closePath(); ctx.globalAlpha=.85; ctx.fill(); ctx.globalAlpha=1;
+  }
+  // splashes
+  for(const s of splashes){
+    const p=s.t/0.35;
+    ctx.strokeStyle=s.water?`rgba(255,255,255,${0.7*(1-p)})`:`rgba(200,220,255,${0.5*(1-p)})`;
+    ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(s.x,s.y,2+p*7,1+p*2,0,0,Math.PI*2); ctx.stroke();
+  }
+  // tank glass
+  ctx.strokeStyle=C.ink; ctx.lineWidth=2.5; ctx.beginPath();
+  ctx.moveTo(T.x,T.y); ctx.lineTo(T.x,T.y+T.h); ctx.lineTo(T.x+T.w,T.y+T.h); ctx.lineTo(T.x+T.w,T.y); ctx.stroke();
+  ctx.fillStyle="rgba(255,255,255,.12)"; ctx.fillRect(T.x+6,T.y+4,5,T.h-8);
+
+  // ruler
+  ctx.font="12px system-ui"; ctx.fillStyle=C.ink; ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.textAlign="left";
+  const ticks=5;
+  for(let i=0;i<=ticks;i++){
+    const v=S.scaleMax*i/ticks, y=T.y+T.h-T.h*i/ticks;
+    ctx.beginPath(); ctx.moveTo(T.x+T.w,y); ctx.lineTo(T.x+T.w+8,y); ctx.stroke();
+    ctx.fillText(fmtNum(v,v<10?1:0)+" mm",T.x+T.w+12,y+4);
+  }
+  // labels
+  ctx.textAlign="center"; ctx.font="600 13px system-ui";
+  ctx.fillText("1 m × 1 m depo",T.x+T.w/2,T.groundY+20);
+  ctx.font="12px system-ui"; ctx.fillStyle=C.muted;
+  ctx.fillText("(ölçek otomatik büyür)",T.x+T.w/2,T.groundY+36);
+  // water level label
+  if (S.mm>0){
+    ctx.textAlign="right"; ctx.font="700 16px system-ui"; ctx.fillStyle=C.ink;
+    ctx.fillText(fmtNum(S.mm,S.mm<10?2:1)+" L/m²",T.x-10,Math.max(T.y+14,waterY+5));
+    ctx.beginPath(); ctx.setLineDash([4,4]); ctx.strokeStyle=C.ink; ctx.moveTo(T.x-6,waterY); ctx.lineTo(T.x,waterY); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // title top-left
+  ctx.textAlign="left"; ctx.font="600 14px system-ui"; ctx.fillStyle=C.ink;
+  let title;
+  if (S.mode==="rate") title=`${S.rate} mm/saat · ${intensityName(S.rate)} yağış`;
+  else if (S.mode==="month") title=`${MONTH_FULL[S.month]} ayı · ~${MONTH_MM[S.month]} mm`;
+  else title=`Yıl boyunca · ${MONTH_FULL[Math.min(11,Math.floor(S.yearT/YEAR_MT))]}`;
+  ctx.fillText(title,14,24);
+  if (!S.running && S.mm===0){ ctx.font="13px system-ui"; ctx.fillStyle=C.muted; ctx.fillText("▶ Başlat'a bas",14,44); }
+  if (!S.running && finished() && S.mm>0){ ctx.font="13px system-ui"; ctx.fillStyle=C.muted; ctx.fillText("✓ Tamamlandı",14,44); }
+
+  // lightning flash
+  if (S.flash>0){ ctx.fillStyle=`rgba(255,255,255,${S.flash*0.45})`; ctx.fillRect(0,0,W,H); }
+}
+
+function drawSkyline(gy){
+  ctx.fillStyle="rgba(0,0,0,.18)";
+  const u=W/100;
+  ctx.beginPath(); ctx.moveTo(0,gy);
+  // binalar
+  const b=[[0,8,10],[8,14,16],[14,20,12],[74,80,14],[80,86,22],[86,93,12],[93,100,18]];
+  for(const [a,c,h] of b){ ctx.lineTo(a*u,gy); ctx.lineTo(a*u,gy-h*u*0.6); ctx.lineTo(c*u,gy-h*u*0.6); ctx.lineTo(c*u,gy); }
+  ctx.lineTo(W,gy); ctx.closePath(); ctx.fill();
+  // cami kubbesi + minareler (sol)
+  const cx=12*u, r=5*u;
+  ctx.beginPath(); ctx.arc(cx,gy-10*u*0.6,r,Math.PI,0); ctx.fill();
+  ctx.fillRect(cx-9*u,gy-26*u*0.6,1.2*u,26*u*0.6); ctx.fillRect(cx+8*u,gy-26*u*0.6,1.2*u,26*u*0.6);
+  // Galata kulesi (sağ)
+  const gx=83*u;
+  ctx.fillRect(gx-2*u,gy-34*u*0.6,4*u,34*u*0.6);
+  ctx.beginPath(); ctx.moveTo(gx-2.6*u,gy-34*u*0.6); ctx.lineTo(gx,gy-42*u*0.6); ctx.lineTo(gx+2.6*u,gy-34*u*0.6); ctx.fill();
+}
+
+requestAnimationFrame(step);
+</script>
+</body>
+</html>
