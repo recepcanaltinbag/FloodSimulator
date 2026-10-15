@@ -7,7 +7,7 @@
 // Ayrıştırma sırasında çalıştığı için document.write betiği eşzamanlı ve sıralı ekler.
 if(document.readyState === "loading"){
   const v = window.ASSET_V ? "?v=" + window.ASSET_V : "";
-  document.write(["osm-cache.js","burn.js","derestat.js","lostcreeks.js"].map(f => '<script src="' + f + v + '"><\/script>').join(""));
+  document.write(["osm-cache.js","burn.js","derestat.js","lostcreeks.js","floodtrace.js","derepanel.js"].map(f => '<script src="' + f + v + '"><\/script>').join(""));
 }
 (function(){
   // Yedek: 14 Ekim 2026, Kağıthane (41,08 K, 28,975 D), 18:00–24:00 saatlik toplamlar (mm), Open-Meteo
