@@ -250,11 +250,11 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="chips" id="scen" style="margin-bottom:10px"></div>
   <div class="ctrl">
     <label>Yağış şiddeti <span id="rateV"></span></label>
-    <input type="range" id="rate" min="5" max="300" step="5" value="200">
+    <input type="range" id="rate" min="5" max="300" step="5" value="80">
   </div>
   <div class="ctrl">
     <label>Yağış süresi <span id="durV"></span></label>
-    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="6">
+    <input type="range" id="dur" min="0.5" max="12" step="0.5" value="4">
   </div>
   <div class="ctrl">
     <label>Zemin (suyu emme)</label>
@@ -401,7 +401,7 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, landN:1, rate:200, durH:6, inf:8, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, landN:1, rate:80, durH:4, inf:8, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -495,7 +495,7 @@ $("goBtn").onclick=()=>{
 // ================= Kontroller =================
 SCEN.forEach(s=>{
   const c=document.createElement("button"); c.className="chip"; c.textContent=`${s.n} · ${s.r} mm/sa · ${s.d} sa`;
-  if(s.n==="Abartılı (görsel)") c.classList.add("on"); // varsayılan senaryo
+  if(s.n==="Aşırı sağanak") c.classList.add("on"); // varsayılan senaryo
   c.onclick=()=>{ $("rate").value=s.r; $("dur").value=s.d; uiUpd(); document.querySelectorAll("#scen .chip").forEach(x=>x.classList.toggle("on",x===c)); };
   $("scen").appendChild(c);
 });
@@ -1535,11 +1535,10 @@ let last=performance.now(), statAcc=0, bldAcc=0;
 function loop(now){
   const rdt=Math.min(0.1,(now-last)/1000); last=now;
   if(S.running && S.loaded){
-    const DT=0.6*Math.sqrt(S.cell/G); // ~1 sn; 1,2 sn'de de kararlı test edildi
+    const DT=0.35*Math.sqrt(S.cell/G);
     const target=S.speed*60*rdt, t0=performance.now();
     let done=0;
-    const budget = S.speed>=60 ? 48 : 30; // "maksimum": hesaba kare başına daha çok süre (~18 kare/sn)
-    while(done<target && performance.now()-t0<budget){ simStep(DT); done+=DT; }
+    while(done<target && performance.now()-t0<20){ simStep(DT); done+=DT; }
     updateWaterMesh();
     statAcc+=rdt; if(statAcc>0.4){ statAcc=0; updStats(); drawDereOverlay(); }
   }
@@ -1577,7 +1576,7 @@ $("nOut").onclick=()=>setView(controls.getPolarAngle(),controls.getAzimuthalAngl
 $("nTop").onclick=()=>setView(0.01,controls.getAzimuthalAngle(),camDist());
 $("nHome").onclick=()=>setView(Math.atan2(180,140),0,Math.hypot(140,180),new THREE.Vector3());
 
-// İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, Abartılı görsel) yüklenir ve yağmur kendiliğinden başlar
+// İlk açılış: seçim ekranı yerine varsayılan bölge (Kağıthane, orta, Aşırı sağanak) yüklenir ve yağmur kendiliğinden başlar
 loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 </script>
 <script src="realrain.js"></script>

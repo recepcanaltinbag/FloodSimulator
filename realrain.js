@@ -34,7 +34,7 @@
   const fb = () => { const c=calibrate(FALLBACK.date,FALLBACK.lat,FALLBACK.lon,FALLBACK.mm,FALLBACK.event);
     return {date:FALLBACK.date, start:START, mm:c.mm, calib:c.calib, place:FALLBACK.place, live:false}; };
   let PAST = fb(), FC = null;      // FC: {date,start,mm,place} ya da {none:true}
-  const RR = window.REALRAIN = {on:true, mode:"past", ...PAST};
+  const RR = window.REALRAIN = {on:false, mode:"past", ...PAST};  // varsayılan: kapalı (Aşırı sağanak); çipten seçilir
 
   const MONTHS = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
   const trDate = s => { const [y,m,d]=s.split("-").map(Number); return `${d} ${MONTHS[m-1]}`; };
@@ -219,11 +219,10 @@
   const first = setInterval(()=>{
     if(!S.loaded) return;
     clearInterval(first);
-    // veri geldiğinde pencere değişmiş olabilir: suyu sıfırlayıp 18:00'den başlat
-    fetchRain(S.lat, S.lon, place()).then(()=>{ if(RR.on && S.simT < 1800){ resetWater(); S.running = true; updPlay(); } });
+    fetchRain(S.lat, S.lon, place());
   }, 300);
 
   // grafiği canlı tut
   setInterval(()=>{ if(RR.on) render(); }, 500);
-  use("past");
+  render();
 })();
