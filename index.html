@@ -27,6 +27,7 @@
 <script src="landmarks.js"></script>
 <script src="data/tr_il_ilce.js"></script>
 <script src="data/tr_daglar.js"></script>
+<script src="data/tr_karst.js"></script>
 <style>
 :root{--bg:#0b0f15;--panel:#141a22;--panel2:#1b232d;--ink:#e6edf3;--muted:#8b98a5;--line:#28313c;--accent:#4ea8ff;--accent-soft:#16283f;--warn:#ff5c5c;--amber:#ffb020;--cyan:#22e0ff}
 *{box-sizing:border-box}
@@ -106,8 +107,9 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .panel ol li span{color:var(--muted)}
 .muted{color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
-@media (max-width:1100px){.stats{grid-template-columns:repeat(4,1fr)}}
-@media (max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stats.k8{grid-template-columns:repeat(8,1fr)}
+@media (max-width:1100px){.stats,.stats.k8{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:600px){.stats,.stats.k8{grid-template-columns:repeat(2,1fr)}}
 .stat .k{font-size:11px;color:var(--muted)}
 .stat .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
 .gauge{height:5px;border-radius:3px;background:var(--line);margin-top:3px;overflow:hidden}
@@ -238,6 +240,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
           <button data-t="cards" class="on">Öne çıkanlar<small>taşkın riskli</small></button>
           <button data-t="il">İl / İlçe<small>81 il</small></button>
           <button data-t="dag">Dağlar<small>zirveler</small></button>
+          <button data-t="karst">Karst<small>düden · polye</small></button>
         </div>
         <div class="pk-tab" id="tab-cards">
           <div class="lbl">Taşkın riskli bilinen bölgeler</div>
@@ -252,6 +255,11 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
           <input class="pk-filter" id="dagQ" placeholder="Dağ ya da il ara… (ör. Erciyes)" autocomplete="off">
           <div class="pk-list" id="dagList"></div>
           <div class="muted" style="font-size:10.5px;margin-top:6px">Dağlarda alan otomatik olarak “Geniş” seçilir; yamaçlar sığsın.</div>
+        </div>
+        <div class="pk-tab" id="tab-karst" hidden>
+          <input class="pk-filter" id="karstQ" placeholder="Karst alanı, tür ya da il ara… (ör. polye)" autocomplete="off">
+          <div class="pk-list" id="karstList"></div>
+          <div class="muted" style="font-size:10.5px;margin-top:6px">Karstik alanlar “Geniş” boyutla açılır; Karst modu (kireçtaşı zemin + düdenler) kendiliğinden açılır.</div>
         </div>
       </div>
       <div>
@@ -307,8 +315,14 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <option value="2">Beton / asfalt (yoğun kentsel) · 2 mm/sa</option>
       <option value="8" selected>Karışık kentsel · 8 mm/sa</option>
       <option value="25">Toprak / orman · 25 mm/sa</option>
+      <option value="80">Karstik kireçtaşı · 80 mm/sa</option>
       <option value="0">Hiç emmesin (en kötü durum)</option>
     </select>
+  </div>
+  <div class="ctrl">
+    <label style="justify-content:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="karstOn"> 🕳️ Karst modu <span class="muted" style="font-weight:400">(kireçtaşı + düdenler)</span></label>
+    <p class="sub" id="karstInfo" style="margin-top:4px" hidden></p>
+    <p class="sub" style="margin-top:4px;font-size:11px">Karstik alanlarda su büyük ölçüde yeraltına süzülür; düdenler kapalı çukurların en alçak noktalarında varsayılır, gerçek düden haritası değildir. Açıkken zemin “Karstik kireçtaşı” (80 mm/sa) olur ve her düden en çok 5 m³/s su yutar.</p>
   </div>
 
   <h2>Kanalizasyon / yağmur suyu sistemi</h2>
@@ -357,7 +371,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <p class="note">
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür; kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
-    Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı
+    Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
   </p>
 </div>
 </aside>
@@ -371,6 +385,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <div class="row"><span class="sw" style="background:var(--amber)"></span>"Dere" adlı yol (kuru)</div>
       <div class="row"><span class="sw" style="background:var(--warn)"></span>"Dere" adlı yol (su altında)</div>
       <div class="row"><span class="sw" style="background:var(--cyan)"></span>Dere / kanal</div>
+      <div class="row" id="lgPonor" hidden><span class="sw" style="background:#0a8f8f;height:8px;width:8px;border-radius:50%;box-shadow:0 0 0 2px #0a8f8f inset,0 0 0 1px #000"></span>Varsayılan düden (karst)</div>
     </div>
     <button class="set-tab" id="setTab" aria-controls="settings">⚙️ Ayarlar</button>
     <div id="labels"></div>
@@ -391,6 +406,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <div class="pbody">
       <label><input type="checkbox" id="showRoads" checked> <span class="sw" style="background:var(--amber)"></span> Adında "dere" geçen yollar</label>
       <label><input type="checkbox" id="showWater" checked> <span class="sw" style="background:var(--cyan)"></span> Dereler / kanallar</label>
+      <label><input type="checkbox" id="showPonor" checked> <span class="sw" style="background:#0a8f8f"></span> Düdenler <span class="muted">(karst modu)</span></label>
       <div id="dereBody" class="muted" style="margin-top:6px">Bölge yüklenince gösterilecek.</div>
       <div class="muted" style="font-size:10.5px;margin-top:6px">Kaynak: OpenStreetMap</div>
     </div>
@@ -403,6 +419,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
     <div class="stat"><div class="k">Karadaki su hacmi</div><div class="v" id="sV">0 m³</div></div>
     <div class="stat"><div class="k">Kanalizasyon doluluğu</div><div class="v" id="sS">—</div><div class="gauge"><i id="gS"></i></div></div>
     <div class="stat"><div class="k">Kanala giden su</div><div class="v" id="sK">0 m³</div></div>
+    <div class="stat" id="stU" hidden><div class="k">Yeraltına giden su</div><div class="v" id="sU">0 m³</div></div>
   </div>
 </div>
 </div>
@@ -446,7 +463,7 @@ const $ = id => document.getElementById(id);
 const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 
 // ================= Durum =================
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, landN:1, rate:200, durH:6, inf:8, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, landN:1, rate:200, durH:6, inf:8, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
@@ -479,6 +496,7 @@ pmap.on("mouseup",()=>{ if(dragging){ dragging=false; pmap.dragging.enable(); } 
 pmap.on("click",e=>pickSet(e.latlng.lat,e.latlng.lng,"Seçili alan"));
 
 function pickSet(lat,lon,name,fly){
+  if(name!==P.name) P.karst=null; // karst listesinden seçilen yer (boyut değişince korunur)
   P.lat=lat; P.lon=lon; P.name=name;
   prect.setBounds(regionBounds(lat,lon,P.size));
   if(fly){ pmap.invalidateSize(); const z=pmap.getSize(); if(z.x&&z.y&&!$("picker").hidden) pmap.flyToBounds(prect.getBounds(),{padding:[40,40],duration:.8}); } // boyutsuz (gizli) haritada uçuş NaN üretir
@@ -487,7 +505,7 @@ function pickSet(lat,lon,name,fly){
 }
 function updPickInfo(){
   const km=regionKm(P.lat,P.size);
-  $("pkSel").innerHTML=`<b>📍 ${P.name}</b><br><span class="muted">${P.lat.toFixed(4)}°K, ${P.lon.toFixed(4)}°D · ${fmt(km,1)} × ${fmt(km,1)} km · hücre ≈ ${fmt(km*1000/256)} m</span>`;
+  $("pkSel").innerHTML=`<b>📍 ${P.name}</b><br><span class="muted">${P.lat.toFixed(4)}°K, ${P.lon.toFixed(4)}°D · ${fmt(km,1)} × ${fmt(km,1)} km · hücre ≈ ${fmt(km*1000/256)} m</span>`+(P.karst?`<br><span class="muted">🕳️ ${P.karst.d} · Karst modu açılacak</span>`:"");
 }
 PLACES.forEach(p=>{
   const c=document.createElement("button"); c.className="pc"; c.dataset.n=p.n;
@@ -533,7 +551,7 @@ async function search(){
 const trKey=s=>s.toLocaleLowerCase("tr-TR").replace(/[çğıöşüâîû]/g,c=>({ç:"c",ğ:"g",ı:"i",ö:"o",ş:"s",ü:"u",â:"a",î:"i",û:"u"})[c]);
 $("pkTabs").querySelectorAll("button").forEach(bt=>bt.onclick=()=>{
   $("pkTabs").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===bt));
-  ["cards","il","dag"].forEach(t=>$("tab-"+t).hidden=t!==bt.dataset.t);
+  ["cards","il","dag","karst"].forEach(t=>$("tab-"+t).hidden=t!==bt.dataset.t);
 });
 function setSize(k){ P.size=k; [...$("segSize").children].forEach(x=>x.classList.toggle("on",x.dataset.k===k)); }
 function pkList(el,items,q){ // items: [{t, s, k, go}]
@@ -568,12 +586,20 @@ function dagRender(){
 }
 $("dagQ").addEventListener("input",dagRender);
 dagRender();
+const KARSTS=(window.TR_KARST||{karst:[]}).karst;
+function karstRender(){
+  pkList($("karstList"),KARSTS.map(m=>({t:m.n,s:`${m.t} · ${m.il}`,k:trKey(m.n+" "+m.t+" "+m.il+" "+m.d),
+    go:()=>{ setSize("l"); pickSet(m.lat,m.lon,m.n,true); P.karst=m; updPickInfo(); }})),$("karstQ").value);
+}
+$("karstQ").addEventListener("input",karstRender);
+karstRender();
 
 function openPicker(){ $("picker").hidden=false; $("pkCancel").hidden=!S.loaded; setTimeout(()=>pmap.invalidateSize(),50); }
 $("openPicker").onclick=openPicker;
 $("pkCancel").onclick=()=>{ pmap.stop(); $("picker").hidden=true; }; // gizli haritada uçuş animasyonu NaN üretir
 $("goBtn").onclick=()=>{
   Object.assign(S,{lat:P.lat,lon:P.lon,name:P.name,size:P.size,q:P.q});
+  if(P.karst){ setKarst(true); KARST.auto=true; } else if(KARST.auto) setKarst(false);
   pmap.stop(); $("picker").hidden=true; loadRegion();
 };
 
@@ -737,6 +763,7 @@ async function loadRegion(shift){
     $("regName").textContent=S.name;
     $("regInfo").textContent=`${fmt(regionKm(S.lat,S.size),1)} km · ${S.lat.toFixed(3)}°K ${S.lon.toFixed(3)}°D`;
     b=sb; sea=nsea; S.cell=cell;
+    karstPrep();
     S.landN=Math.max(1,N*N-sea.reduce((a,v)=>a+v,0));
     elevCanvas=null; roadCanvas=null; blendCanvas=null; // yükseklik renkleri gerektiğinde üretilir
     satCanvas=sat; if(!sat) $("tex").value="elev";
@@ -1091,13 +1118,64 @@ function buildBuildings(els){
   $("bldInfo").textContent=`${fmt(cnt)} bina${S.size==="s"?"":" (kamera çevresi)"} · bina kaplı alan: %${fmt(bc/S.landN*100,1)}`;
 }
 
+// ================= Karst (düdenler / kapalı çukurlar) =================
+// Kapalı çukurlar priority-flood ile bulunur: kenardan ve denizden başlayarak her hücre, oraya ulaşan en düşük "taşma"
+// seviyesine kadar doldurulur. Doldurma derinliği > KARST_DMIN olan bağlı hücreler bir çukurdur (dolin / polye tabanı);
+// en derin noktası ≥ KARST_DPIT olanların en alçak hücresi düden (ponor) sayılır. Gerçek düden haritası değildir.
+const KARST={on:false, auto:false, soilPrev:null, sink:null, ponors:[], depN:0};
+const KARST_INF=80, PONOR_Q=5, KARST_DMIN=0.5, KARST_DPIT=1; // mm/sa, m³/s (her düden), m, m
+function karstPrep(){
+  const n=N*N, F=new Float32Array(n), done=new Uint8Array(n), hk=new Float32Array(n), hi=new Int32Array(n); let hs=0;
+  const push=(i,v)=>{ let c=hs++; while(c>0){ const p=(c-1)>>1; if(hk[p]<=v) break; hk[c]=hk[p]; hi[c]=hi[p]; c=p; } hk[c]=v; hi[c]=i; };
+  const pop=()=>{ const top=hi[0], v=hk[--hs], ii=hi[hs]; let c=0;
+    for(;;){ let l=2*c+1; if(l>=hs) break; if(l+1<hs&&hk[l+1]<hk[l]) l++; if(hk[l]>=v) break; hk[c]=hk[l]; hi[c]=hi[l]; c=l; }
+    hk[c]=v; hi[c]=ii; return top; };
+  for(let i=0;i<n;i++){ const x=i%N, y=(i-x)/N; if(sea[i]||x===0||y===0||x===N-1||y===N-1){ F[i]=b[i]; done[i]=1; push(i,b[i]); } }
+  while(hs){
+    const i=pop(), x=i%N, f=F[i];
+    for(const j of [x>0?i-1:-1, x<N-1?i+1:-1, i>=N?i-N:-1, i<n-N?i+N:-1]){
+      if(j<0||done[j]) continue; done[j]=1; F[j]=b[j]>f?b[j]:f; push(j,F[j]);
+    }
+  }
+  const comp=new Uint8Array(n), sink=new Uint8Array(n), ponors=[], st=[]; let depN=0;
+  for(let s0=0;s0<n;s0++){
+    if(comp[s0]||F[s0]-b[s0]<=KARST_DMIN) continue;
+    let low=s0, mx=0; comp[s0]=1; st.push(s0);
+    while(st.length){
+      const i=st.pop(), x=i%N, dd=F[i]-b[i]; depN++;
+      if(dd>mx) mx=dd; if(b[i]<b[low]) low=i;
+      for(const j of [x>0?i-1:-1, x<N-1?i+1:-1, i>=N?i-N:-1, i<n-N?i+N:-1])
+        if(j>=0&&!comp[j]&&F[j]-b[j]>KARST_DMIN){ comp[j]=1; st.push(j); }
+    }
+    if(mx>=KARST_DPIT){ sink[low]=1; ponors.push(low); }
+  }
+  Object.assign(KARST,{sink,ponors,depN});
+  karstUI();
+}
+function setKarst(on){
+  KARST.auto=false;
+  if(on!==KARST.on){
+    if(on){ KARST.soilPrev=$("soil").value; $("soil").value=String(KARST_INF); }
+    else if(KARST.soilPrev!=null && $("soil").value===String(KARST_INF)) $("soil").value=KARST.soilPrev;
+    KARST.on=on;
+  }
+  $("karstOn").checked=on; uiUpd(); karstUI(); drawDereOverlay(); updStats();
+}
+function karstUI(){
+  const on=KARST.on;
+  $("stU").hidden=!on; document.querySelector(".stats").classList.toggle("k8",on); $("lgPonor").hidden=!on; $("karstInfo").hidden=!on;
+  if(on && KARST.sink) $("karstInfo").textContent=`Bu alanda ${KARST.ponors.length} kapalı çukur/düden bulundu · çukur alanı ≈ ${fmt(KARST.depN*S.cell*S.cell/1e6,2)} km².`;
+}
+$("karstOn").onchange=e=>setKarst(e.target.checked);
+$("showPonor").onchange=()=>drawDereOverlay();
+
 // ================= Simülasyon (virtual pipes) =================
 function resetWater(){
   if(!b) return;
   d=new Float32Array(N*N); H=new Float32Array(N*N);
   fL=new Float32Array(N*N); fR=new Float32Array(N*N); fT=new Float32Array(N*N); fB=new Float32Array(N*N);
   for(let i=0;i<N*N;i++) if(sea[i]) d[i]=-b[i];
-  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.running=false; updPlay(); updStats();
+  S.simT=0; S.rainMM=0; S.stored=0; S.drained=0; S.under=0; S.underP=0; S.running=false; updPlay(); updStats();
   if(waterMesh){ updateWaterMesh(); drawDereOverlay(); }
 }
 function simStep(dt){
@@ -1129,6 +1207,8 @@ function simStep(dt){
   const outStep=sw.out*toM, storeM=sw.store/1000;
   const allow=Math.min(sw.rate*(1-S.block/100)*toM, Math.max(0,storeM-S.stored)+outStep);
   let taken=0;
+  // karst: zemine süzülen ve düdenlerden yutulan su "yeraltına" sayılır (mod kapalıyken hiçbir şey değişmez)
+  const K=KARST.on?KARST.sink:null, pq=PONOR_Q*dt/l2; let under=0, underP=0;
   for(let y=0;y<N;y++){
     for(let x=0;x<N;x++){
       const i=y*N+x;
@@ -1141,11 +1221,16 @@ function simStep(dt){
       if(y<N-1) inflow+=fT[i+N];
       const out=fL[i]+fR[i]+fT[i]+fB[i];
       let nd=d[i]+dt*(inflow-out)/l2+rain-inf;
+      if(K){
+        if(nd>-inf) under+=nd<0?nd+inf:inf;
+        if(K[i]&&nd>0){ const tk=nd<pq?nd:pq; nd-=tk; underP+=tk; }
+      }
       if(allow>0 && nd>0){ const tk=nd<allow?nd:allow; nd-=tk; taken+=tk; }
       d[i]=nd>0?nd:0;
     }
   }
   S.stored+=taken/S.landN; S.drained+=taken*S.cell*S.cell;
+  if(K){ S.under+=(under+underP)*l2; S.underP+=underP*l2; }
   S.stored=Math.max(0,S.stored-outStep);
   S.simT+=dt; if(raining) S.rainMM+=S.rate*dt/3600;
 }
@@ -1572,7 +1657,7 @@ function drawDereOverlay(){
   if(!dereCanvas) return;
   const g=dereCanvas.getContext("2d"), W=dereCanvas.width, f=W/(N-1);
   g.clearRect(0,0,W,W);
-  if(!DERE){ dereTex.needsUpdate=true; return; }
+  if(!DERE){ drawPonors(g,f); dereTex.needsUpdate=true; return; }
   g.lineCap=g.lineJoin="round";
   if($("showWater").checked){
     g.strokeStyle="#22e0ff"; g.lineWidth=2.5;
@@ -1594,7 +1679,17 @@ function drawDereOverlay(){
       }
     }
   }
+  drawPonors(g,f);
   dereTex.needsUpdate=true;
+}
+function drawPonors(g,f){
+  if(!KARST.on||!$("showPonor").checked) return;
+  const r=Math.max(5,f*1.4);
+  for(const i of KARST.ponors){
+    const x=(i%N)*f, y=Math.floor(i/N)*f;
+    g.beginPath(); g.arc(x,y,r,0,7); g.lineWidth=5; g.strokeStyle="rgba(0,0,0,.55)"; g.stroke();
+    g.lineWidth=2.6; g.strokeStyle="#0a9a9a"; g.stroke();
+  }
 }
 
 // ================= İstatistik =================
@@ -1614,12 +1709,15 @@ function updStats(){
   $("sS").textContent = S.sewer.store>0 ? "%"+fmt(full) : "—";
   $("gS").style.width=full+"%"; $("gS").style.background = full>95?"var(--warn)":full>70?"var(--amber)":"var(--accent)";
   $("sK").textContent = S.drained>1e6 ? fmt(S.drained/1e6,2)+" milyon m³" : fmt(S.drained)+" m³";
+  const uv=v=>v>1e6 ? fmt(v/1e6,2)+" milyon m³" : fmt(v)+" m³";
+  if(KARST.on){ $("sU").textContent=uv(S.under); $("stU").title=`Zemine süzülen: ${uv(S.under-S.underP)} · düdenlerden: ${uv(S.underP)}`; }
   const raining=S.simT<S.durH*3600;
   $("liveSt").textContent = S.simT===0 ? `${S.name} · hazır` :
     `${raining?"🌧️":"☁️"} ${S.rate} mm/sa · ${$("sT").textContent}${S.running?"":" · duraklatıldı"}`;
   $("hud").innerHTML = S.simT===0 ? `<b>${S.name}</b><br><span class="muted">Yağmur başlıyor…</span>` :
     (raining ? `🌧️ Yağıyor · <b>${S.rate} mm/sa</b>` : "☁️ Yağmur durdu · su çekiliyor/birikiyor") +
     (full>95 && raining ? `<br><span style="color:var(--warn)">⚠️ Kanalizasyon dolu, ızgaralar suyu alamıyor</span>` : "") +
+    (KARST.on ? `<br><span style="color:#3fd6d6">🕳️ Karst modu · ${KARST.ponors.length} düden · yeraltına ${uv(S.under)}</span>` : "") +
     `<br><span class="muted">${S.name} · 1 hücre ≈ ${fmt(S.cell)} m</span>`;
   updDereStats();
 }
