@@ -365,8 +365,8 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
   <div class="ctrl">
     <label>Zemin (suyu emme)</label>
     <select id="soil">
-      <option value="2">Beton / asfalt (yoğun kentsel) · 6 → 1 mm/sa</option>
-      <option value="8" selected>Karışık kentsel · 30 → 3 mm/sa</option>
+      <option value="2" selected>Beton / asfalt (yoğun kentsel) · 6 → 1 mm/sa</option>
+      <option value="8">Karışık kentsel · 30 → 3 mm/sa</option>
       <option value="25">Toprak / orman · 75 → 10 mm/sa</option>
       <option value="80">Karstik kireçtaşı · 150 → 60 mm/sa</option>
       <option value="0">Hiç emmesin (en kötü durum)</option>
@@ -567,7 +567,7 @@ const fmt = (x,d=0) => x.toLocaleString("tr-TR",{maximumFractionDigits:d});
 const SOILS = {"0":{f0:0,fc:0,k:2}, "2":{f0:6,fc:1,k:4}, "8":{f0:30,fc:3,k:2}, "25":{f0:75,fc:10,k:2}, "80":{f0:150,fc:60,k:1}};
 const ANTE = {dry:0, wet:1, sat:3};   // başlangıç ıslaklığı (x): kuru, nemli (kapasite ~%37'ye inmiş), doygun (~%5)
 const infCap = () => S.soil.fc + (S.soil.f0 - S.soil.fc)*Math.exp(-S.wetX);
-const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:30, soil:SOILS["8"], soilV:"8", ante:1, wetX:1, speed:60, ex:1.5,
+const S = {sewer:SEWERS.std, block:20, stored:0, drained:0, under:0, underP:0, extIn:0, landN:1, rate:40, durH:3, inf:30, soil:SOILS["2"], soilV:"2", ante:1, wetX:1, speed:60, ex:1.5,
            running:false, simT:0, rainMM:0, loaded:false, cell:29,
            lat:PLACES[0].lat, lon:PLACES[0].lon, name:PLACES[0].n, size:"m", q:2};
 let blendCanvas=null, LABELS=[];
