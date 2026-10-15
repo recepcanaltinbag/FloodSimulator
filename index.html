@@ -200,6 +200,13 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 .seg button{border:0;background:transparent;color:var(--ink);padding:7px 4px;border-radius:8px;cursor:pointer;font-size:12px;line-height:1.2}
 .seg button small{display:block;color:var(--muted);font-size:10.5px}
 .seg button.on{background:var(--panel2);box-shadow:0 1px 3px rgba(0,0,0,.4);font-weight:600}
+.udem-drop{display:block;border:1.5px dashed var(--line);border-radius:12px;padding:9px 12px;cursor:pointer;font-size:13px;background:var(--bg)}
+.udem-drop:hover,.udem-drop.over{border-color:var(--amber);background:rgba(255,176,32,.08)}
+.udem-drop small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}
+.udem-info{font-size:12px;line-height:1.45;margin-top:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.udem-info .btn.sm{padding:3px 8px;font-size:11px}
+.udem-sm{display:block;margin:6px 0 2px;cursor:pointer;font-size:12px}.udem-sm input{vertical-align:middle;margin:0 5px 0 0}
+#demBadge{display:block;color:var(--amber)}#demBadge a{color:var(--accent)}
 .pk-sel{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px}
 .pk-sel b{font-size:15px}
 .pk-go{padding:13px;font-size:15px;border-radius:12px}
@@ -301,6 +308,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
         <div class="lbl">Uydu görüntü kalitesi</div>
         <div class="seg" id="segQ"></div>
       </div>
+      <div class="udem" id="udemPk"></div>
       <div class="pk-sel" id="pkSel"></div>
       <button class="btn pk-go" id="goBtn">Bu bölgeyi yükle →</button>
       <button class="btn ghost sm" id="pkCancel" hidden>Vazgeç</button>
@@ -323,7 +331,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <div class="region">
     <div class="ic">📍</div>
-    <div><b id="regName">—</b><small id="regInfo"></small></div>
+    <div><b id="regName">—</b><small id="regInfo"></small><small id="demBadge" hidden></small></div>
     <button class="btn ghost sm" id="openPicker">Değiştir</button>
   </div>
 </div>
@@ -395,6 +403,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
       <option value="elev">Yükseklik renkleri</option>
     </select>
   </div>
+  <div class="ctrl udem" id="udemSet"></div>
 
   <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="flowOn" checked> Akış animasyonu <span class="muted" style="font-weight:400">(suyun aktığı yön)</span></label>
   <label style="display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:6px;cursor:pointer"><input type="checkbox" id="ringOn" checked> Çevre arazisi <span class="muted" style="font-weight:400">(yalnız görünüm, simülasyon yok)</span></label>
@@ -409,7 +418,7 @@ select{width:100%;padding:7px;border-radius:8px;border:1px solid var(--line);bac
 
   <p class="note">
     Model: basitleştirilmiş sığ su akışı ("virtual pipes"), 256×256 hücre. Binalar isteğe bağlı olarak engel sayılır (çatıya düşen yağmur sokağa akar); dere ıslahı hesaba katılmaz; kanalizasyon alan geneli bir kapasite olarak modellenir. Çevredeki arazi yalnızca görünümdür, ama oraya düşen yağmurun bu alana akan kısmı kaba bir havza modeliyle kenardan girer ("Havzadan gelen su"); kenara yaklaşınca simülasyon alanı oraya taşınır (otomatik ya da "Bu bölgeye geç" ile), su korunur. Sonuçlar gösterim amaçlıdır, gerçek taşkın tahmini değildir.<br><br>
-    Veri: AWS Terrain Tiles (SRTM vd.) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
+    Veri: AWS Terrain Tiles (SRTM vd.; isteğe bağlı olarak kullanıcının kendi DEM dosyası, yalnızca tarayıcıda okunur, geotiff.js + proj4js) · Esri World Imagery · © OpenStreetMap katkıcıları (Overpass API) · Nominatim · İl/ilçe merkezleri: OpenStreetMap (Nominatim) + geoBoundaries ADM2 listesi · Dağ zirveleri: Wikidata/OSM, AWS DEM ile doğrulandı · Karst alanları: OSM/Nominatim ve Wikipedia konumları
   </p>
 </div>
 </aside>
@@ -801,11 +810,14 @@ async function loadRegion(shift){
     for(let y=0;y<N;y++)for(let x=0;x<N;x++){
       const k0=y*2*512+x*2; nb[y*N+x]=(dem[k0]+dem[k0+1]+dem[k0+512]+dem[k0+513])/4;
     }
+    // kendi DEM'i (userdem.js): kapsadığı hücreler deniz maskesi/boşluk/yumuşatma öncesinde değiştirilir
+    const ud=window.udemSample ? await udemSample(nb,{n,x0:cx-256,y0:cy-256,lat},prog) : null;
+    if(gen!==LOADGEN){ if(shift) shiftBusy=false; return; }
     const nsea=new Uint8Array(N*N); for(let i=0;i<N*N;i++) nsea[i]=nb[i]<=0.3?1:0;
     if(shift) await idle();
     fillVoids(nb,nsea);
     if(shift) await idle();
-    const sb=shift ? await smoothDEMAsync(nb) : smoothDEM(nb), cell=156543.03*Math.cos(lat*Math.PI/180)/n*2;
+    const sb=ud&&ud.cov>0&&!ud.smooth ? nb : shift ? await smoothDEMAsync(nb) : smoothDEM(nb), cell=156543.03*Math.cos(lat*Math.PI/180)/n*2;
     if(shift) await idle();
     let pre=null, smk=null;
     let preTex=null;
@@ -844,6 +856,7 @@ async function loadRegion(shift){
       ringShifted(); shiftDone();
     } else { resetWater(); buildScene(); ringReset(); }
     S.loaded=true; $("overlay").style.display="none";
+    if(window.udemLoaded) udemLoaded();
     $("play").disabled=$("reset").disabled=false;
     if(!shift){ S.running=true; updPlay(); } // başlat butonu yok: yeni bölge yüklenince yağmur kendiliğinden başlar
     pickSet(S.lat,S.lon,S.name);
@@ -2169,7 +2182,7 @@ function updStats(){
     (KARST.on ? `<br><span style="color:#3fd6d6">🕳️ Karst modu · ${KARST.ponors.length} düden · yeraltına ${uv(S.under)}</span>` :
      SINK ? `<br><span style="color:#c58cff">🕳️ Kapalı çukurlar boşalıyor · yeraltına ${uv(S.under)}</span>` : "") +
     (UP.on&&S.extIn>0 ? `<br><span style="color:#8fd3ff">🏞️ Havzadan gelen su · ${uv(S.extIn)}${upQ>0.05?` · şu an ${fmt(upQ,upQ<10?1:0)} m³/s`:""}</span>` : "") +
-    `<br><span class="muted">${S.name} · 1 hücre ≈ ${fmt(S.cell)} m</span>`;
+    (window.UDEM_TAG||"") + `<br><span class="muted">${S.name} · 1 hücre ≈ ${fmt(S.cell)} m</span>`;
   updDereStats();
 }
 function updDereStats(){
@@ -2491,7 +2504,7 @@ loadRegion().then(()=>{ if(S.loaded){ S.running=true; updPlay(); } });
 <script>
 // yardımcı betikler: GitHub Pages 10 dk önbellekler; 5 dakikalık sürüm ekiyle güncellemeler hızlı gelsin
 window.ASSET_V = Math.floor(Date.now()/3e5);
-document.write('<script src="realrain.js?v='+ASSET_V+'"><\/script>');
+document.write('<script src="realrain.js?v='+ASSET_V+'"><\/script><script src="userdem.js?v='+ASSET_V+'"><\/script>');
 </script>
 </body>
 </html>
